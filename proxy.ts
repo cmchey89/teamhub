@@ -1,10 +1,9 @@
-import { auth } from "./auth";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export async function proxy(request: NextRequest) {
-  const session = await auth();
-  if (!session) {
+export function proxy(request: NextRequest) {
+  const session = request.cookies.get("teamhub_session");
+  if (!session?.value) {
     return NextResponse.redirect(new URL("/", request.url));
   }
   return NextResponse.next();

@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { useSession } from "next-auth/react";
 import { Send, MessageSquare } from "lucide-react";
 
 interface Message {
@@ -17,8 +16,8 @@ interface Project {
 }
 
 export default function ChatPage() {
-  const { data: session } = useSession();
-  const user = session?.user;
+  const [user, setUser] = useState<{ id: string; name?: string | null } | null>(null);
+  useEffect(() => { fetch("/api/auth/me").then(r => r.json()).then(d => setUser(d.user)); }, []);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);

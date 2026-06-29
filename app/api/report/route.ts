@@ -1,12 +1,12 @@
-import { NextResponse } from "next/server";
-import { auth } from "../../../auth";
+import { NextRequest, NextResponse } from "next/server";
+import { getSessionFromRequest } from '../../../lib/auth/session';
 import { db } from "../../../lib/db/client";
 import { tasks } from "../../../lib/db/schema";
 import { gte, lte, and } from "drizzle-orm";
 
-export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function GET(req: NextRequest) {
+  const session = getSessionFromRequest(req);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const from = searchParams.get("from");

@@ -1,5 +1,4 @@
 "use client";
-import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { FolderKanban, CheckSquare, TrendingUp, Layers } from "lucide-react";
 import Link from "next/link";
@@ -11,7 +10,6 @@ interface Stats {
 }
 
 export default function DashboardPage() {
-  const { data: session } = useSession();
   const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {
@@ -25,7 +23,7 @@ export default function DashboardPage() {
     <div className="p-8">
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-gray-900">
-          Welcome back, {session?.user?.name || "there"}
+          Welcome back
         </h2>
         <p className="text-gray-500 mt-1">Here&apos;s what&apos;s happening across all teams today.</p>
       </div>

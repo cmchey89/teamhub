@@ -1,13 +1,13 @@
-import { NextResponse } from "next/server";
-import { auth } from "../../../../../auth";
+import { NextRequest, NextResponse } from "next/server";
+import { getSessionFromRequest } from '../../../../../lib/auth/session';
 import { db } from "../../../../../lib/db/client";
 import { tasks, taskHandoffs } from "../../../../../lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 
 // GET — fetch handoff history for a task
-export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = getSessionFromRequest(req);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const history = await db.select().from(taskHandoffs)
     .where(eq(taskHandoffs.taskId, id))
@@ -16,9 +16,9 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 }
 
 // POST — send task to another team (handoff)
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = getSessionFromRequest(req);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const { toTeam, note } = await req.json();
 
@@ -33,7 +33,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     fromTeam,
     toTeam,
     note: note || null,
-    sentBy: session.user.name || session.user.email || "Unknown",
+    sentBy: session.name || session.email || "Unknown",
   }).returning();
 
   await db.update(tasks).set({
@@ -46,9 +46,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 }
 
 // PATCH — resolve or return a handoff (by the receiving team)
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = getSessionFromRequest(req);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const { handoffId, action, resolvedNote } = await req.json();
   // action: "resolve" | "return"
@@ -60,7 +60,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   await db.update(taskHandoffs).set({
     status: newStatus,
     resolvedNote: resolvedNote || null,
-    resolvedBy: session.user.name || session.user.email || "Unknown",
+    resolvedBy: session.name || session.email || "Unknown",
     resolvedAt: new Date(),
   }).where(eq(taskHandoffs.id, handoffId));
 
