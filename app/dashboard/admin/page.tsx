@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Users, Trash2 } from "lucide-react";
 
 interface Member { id: string; email: string; name: string; role: string; createdAt: string; }
+interface ResetModal { userId: string; name: string; }
 
 export default function AdminPage() {
   const router = useRouter();
@@ -15,6 +16,11 @@ export default function AdminPage() {
   const [role, setRole] = useState<"admin" | "member">("member");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetModal, setResetModal] = useState<ResetModal | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
 
   const load = () =>
     fetch("/api/auth/register")
@@ -42,6 +48,23 @@ export default function AdminPage() {
     setName(""); setEmail(""); setPassword(""); setRole("member");
     setShowForm(false); setLoading(false);
     load();
+  };
+
+  const handleReset = async () => {
+    if (!resetModal) return;
+    if (newPassword.length < 8) { setResetError("Password must be at least 8 characters."); return; }
+    setResetLoading(true); setResetError(null);
+    const res = await fetch("/api/auth/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: resetModal.userId, newPassword }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setResetError(d.error || "Failed."); setResetLoading(false); return;
+    }
+    setResetSuccess(true); setResetLoading(false);
+    setTimeout(() => { setResetModal(null); setNewPassword(""); setResetSuccess(false); }, 1500);
   };
 
   return (
@@ -101,6 +124,7 @@ export default function AdminPage() {
                 <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Role</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Added</th>
+                <th className="px-6 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -121,10 +145,39 @@ export default function AdminPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-gray-500">{new Date(m.createdAt).toLocaleDateString()}</td>
+                  <td className="px-6 py-4">
+                    <button onClick={() => { setResetModal({ userId: m.id, name: m.name }); setNewPassword(""); setResetError(null); setResetSuccess(false); }}
+                      className="text-xs text-blue-600 hover:underline">Reset password</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Reset password modal */}
+      {resetModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <h3 className="font-bold text-gray-900 mb-1">Reset Password</h3>
+            <p className="text-sm text-gray-500 mb-4">Set a new password for <span className="font-medium text-gray-800">{resetModal.name}</span></p>
+            <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+              placeholder="New password (min 8 chars)" minLength={8}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3" />
+            {resetError && <p className="text-xs text-red-600 mb-3">{resetError}</p>}
+            {resetSuccess && <p className="text-xs text-green-600 mb-3">Password updated successfully!</p>}
+            <div className="flex gap-2">
+              <button onClick={handleReset} disabled={resetLoading}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                {resetLoading ? "Saving…" : "Save"}
+              </button>
+              <button onClick={() => setResetModal(null)}
+                className="border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -8,6 +9,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [setupAvailable, setSetupAvailable] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/setup").then(r => r.json()).then(d => setSetupAvailable(d.allowed));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -66,6 +72,15 @@ export default function LoginPage() {
             {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
+
+        {setupAvailable && (
+          <p className="text-center text-xs text-gray-400 mt-6">
+            First time?{" "}
+            <Link href="/setup" className="text-blue-600 hover:underline font-medium">
+              Create admin account
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   );
