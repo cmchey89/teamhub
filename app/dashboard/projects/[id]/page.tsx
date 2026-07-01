@@ -481,7 +481,7 @@ function BackgroundTab(props: {
       </div>
 
       <div className="border-t border-gray-100 pt-5">
-        <TaskTree {...props} />
+        <TaskTree {...props} targetEnd={bg?.targetEnd ?? null} />
       </div>
     </div>
   );
@@ -508,12 +508,13 @@ function TaskTree(props: {
   addingTaskFor: { stageId: string; parentId: string | null } | null; setAddingTaskFor: (v: { stageId: string; parentId: string | null } | null) => void;
   addTask: (stageId: string, parentId: string | null, title: string) => void;
   taskView: "list" | "timeline"; setTaskView: (v: "list" | "timeline") => void;
+  targetEnd: string | null;
 }) {
   const {
     stages, tasks, comments, openTasks, toggleOpen, expandAllTasks, collapseAllTasks,
     openComments, toggleComments, submitRemark, attachPhoto,
     toggleMilestone, deleteTask, patchTask, patchStage, addStage, deleteStage,
-    addingTaskFor, setAddingTaskFor, addTask, taskView, setTaskView,
+    addingTaskFor, setAddingTaskFor, addTask, taskView, setTaskView, targetEnd,
   } = props;
 
   return (
@@ -531,7 +532,7 @@ function TaskTree(props: {
       </div>
 
       {taskView === "timeline" ? (
-        <GanttView stages={stages} tasks={tasks} />
+        <GanttView stages={stages} tasks={tasks} targetEnd={targetEnd} />
       ) : (
       <div className="border border-gray-200 rounded-xl overflow-hidden">
         <div className="grid grid-cols-[1fr_70px_70px_70px_70px_60px] gap-1 bg-gray-50 border-b border-gray-200 px-2.5 py-1.5 text-[10px] font-medium text-gray-400 uppercase">
@@ -589,7 +590,7 @@ function TaskTree(props: {
 
 // ── Gantt / Timeline view ────────────────────────────────────────────────
 
-function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
+function GanttView({ stages, tasks, targetEnd }: { stages: Stage[]; tasks: PlanTask[]; targetEnd: string | null }) {
   const allDates: number[] = [];
   for (const s of stages) {
     if (s.planStart) allDates.push(new Date(s.planStart).getTime());
@@ -600,6 +601,8 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
       if (d) allDates.push(new Date(d).getTime());
     }
   }
+  const deadlineMs = targetEnd ? new Date(targetEnd).getTime() : null;
+  if (deadlineMs !== null) allDates.push(deadlineMs);
   const today = Date.now();
 
   if (allDates.length === 0) {
@@ -609,6 +612,7 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
   const rangeStart = Math.min(...allDates, today);
   const rangeEnd = Math.max(...allDates, today);
   const span = Math.max(rangeEnd - rangeStart, 86400000);
+  const deadlinePct = deadlineMs !== null ? ((deadlineMs - rangeStart) / span) * 100 : null;
 
   const pct = (d: string | null) => d ? ((new Date(d).getTime() - rangeStart) / span) * 100 : null;
   const todayPct = ((today - rangeStart) / span) * 100;
@@ -641,20 +645,35 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
         <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: RISK_COLOR.warning }} /> Warning</span>
         <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: RISK_COLOR.risk }} /> Risk</span>
         <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rotate-45 inline-block" style={{ background: "#9333EA" }} /> Milestone</span>
+        <span className="flex items-center gap-1"><span className="w-px h-3 inline-block bg-blue-500" /> Today</span>
+        {targetEnd && <span className="flex items-center gap-1"><Flag className="w-2.5 h-2.5 text-red-500" /> Deadline</span>}
       </div>
 
-      <div className="flex mb-2">
-        <div className="w-36 flex-shrink-0" />
-        <div className="flex-1 relative h-4 text-[9px] text-gray-400">
-          {tickDates.map((d, i) => (
-            <span key={i} className="absolute -translate-x-1/2" style={{ left: `${(i / ticks) * 100}%` }}>
-              {d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-            </span>
-          ))}
+      <div className="relative">
+        {/* Today / deadline lines span the full height of the ruler + rows below, aligned to the bar-area column (offset past the w-36 label column). */}
+        <div className="absolute left-36 right-0 top-0 bottom-0 pointer-events-none z-10">
+          {todayPct >= 0 && todayPct <= 100 && (
+            <div className="absolute top-0 bottom-0 w-px bg-blue-500" style={{ left: `${todayPct}%` }} />
+          )}
+          {deadlinePct !== null && deadlinePct >= 0 && deadlinePct <= 100 && (
+            <div className="absolute top-0 bottom-0 w-px bg-red-400" style={{ left: `${deadlinePct}%` }}>
+              <Flag className="w-3 h-3 text-red-500 absolute -top-4 -translate-x-1/2" style={{ left: "50%" }} />
+            </div>
+          )}
         </div>
-      </div>
 
-      {stages.map(stage => {
+        <div className="flex mb-2">
+          <div className="w-36 flex-shrink-0" />
+          <div className="flex-1 relative h-4 text-[9px] text-gray-400">
+            {tickDates.map((d, i) => (
+              <span key={i} className="absolute -translate-x-1/2" style={{ left: `${(i / ticks) * 100}%` }}>
+                {d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {stages.map(stage => {
         const mainTasks = tasks.filter(t => t.stageId === stage.id && !t.parentId);
         return (
           <div key={stage.id} className="mb-4">
@@ -696,6 +715,7 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
