@@ -983,28 +983,28 @@ function GanttView({ stages, tasks, openTasks, toggleOpen }: { stages: Stage[]; 
     rows.push({
       key: t.id,
       label: (
-        <div className={`h-6 flex items-center gap-1.5 pr-4 text-sm cursor-pointer whitespace-nowrap ${t.parentId ? "pl-6" : ""} ${dim ? "opacity-50" : ""}`} onClick={() => hasChildren && toggleOpen(t.id)}>
+        <div className={`h-10 flex items-center gap-1.5 pr-4 text-sm cursor-pointer ${t.parentId ? "pl-6" : ""} ${dim ? "opacity-50" : ""}`} onClick={() => hasChildren && toggleOpen(t.id)}>
           {hasChildren && <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(t.id) ? "rotate-90" : ""}`} />}
           {t.isMilestone ? <span className="w-1.5 h-1.5 rotate-45 flex-shrink-0" style={{ background: "#9333EA" }} /> : <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-gray-300" />}
-          <span className={t.status === "done" ? "line-through text-gray-400" : t.isMilestone ? "text-purple-700 font-medium" : t.parentId ? "text-gray-500" : "text-gray-700"}>{t.title}</span>
+          <span className={`line-clamp-2 ${t.status === "done" ? "line-through text-gray-400" : t.isMilestone ? "text-purple-700 font-medium" : t.parentId ? "text-gray-500" : "text-gray-700"}`}>{t.title}</span>
           {opts.badge === "current" && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full animate-pulse flex-shrink-0" style={{ background: CURRENT_COLOR }}>● CURRENT</span>}
           {opts.badge === "next" && <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded-full flex-shrink-0">NEXT UP</span>}
         </div>
       ),
       bar: (
-        <div title={tooltip} className={`relative h-6 rounded hover:bg-gray-50 ${dim ? "opacity-50" : ""}`}>
+        <div title={tooltip} className={`relative h-10 rounded hover:bg-gray-50 ${dim ? "opacity-50" : ""}`}>
           {renderDecorations()}
-          <div className="absolute top-2 left-0 right-0 h-1.5 bg-gray-100 rounded" />
+          <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1.5 bg-gray-100 rounded" />
           {planL !== null && planR !== null && (
-            <div className="absolute top-2 h-1.5 rounded bg-gray-300" style={{ left: `${planL}%`, width: `${Math.max(planR - planL, 0.5)}%` }} />
+            <div className="absolute top-1/2 -translate-y-1/2 h-1.5 rounded bg-gray-300" style={{ left: `${planL}%`, width: `${Math.max(planR - planL, 0.5)}%` }} />
           )}
           {actL !== null && actR !== null && (
-            <div className="absolute top-2 h-1.5 rounded" style={{ left: `${actL}%`, width: `${Math.max(actR - actL, 0.5)}%`, background: t.status === "in_progress" && !dim ? CURRENT_COLOR : barColor(t) }} />
+            <div className="absolute top-1/2 -translate-y-1/2 h-1.5 rounded" style={{ left: `${actL}%`, width: `${Math.max(actR - actL, 0.5)}%`, background: t.status === "in_progress" && !dim ? CURRENT_COLOR : barColor(t) }} />
           )}
           {actR !== null && (
             t.isMilestone
-              ? <div className="absolute top-[5px] w-2.5 h-2.5 rotate-45 -translate-x-1/2 border-2 border-white shadow" style={{ left: `${actR}%`, background: barColor(t) }} />
-              : <div className="absolute top-[5px] w-2.5 h-2.5 rounded-full -translate-x-1/2 border-2 border-white shadow" style={{ left: `${actR}%`, background: t.status === "in_progress" && !dim ? CURRENT_COLOR : barColor(t) }} />
+              ? <div className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rotate-45 border-2 border-white shadow" style={{ left: `${actR}%`, background: barColor(t) }} />
+              : <div className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2 border-white shadow" style={{ left: `${actR}%`, background: t.status === "in_progress" && !dim ? CURRENT_COLOR : barColor(t) }} />
           )}
         </div>
       ),
@@ -1020,13 +1020,13 @@ function GanttView({ stages, tasks, openTasks, toggleOpen }: { stages: Stage[]; 
     rows.push({
       key: `stage-${stage.id}`,
       label: (
-        <div className="cursor-pointer rounded hover:bg-gray-50 flex items-center gap-1.5 py-1 whitespace-nowrap" onClick={() => toggleOpen(stage.id)}>
+        <div className="h-12 cursor-pointer rounded hover:bg-gray-50 flex items-center gap-1.5" onClick={() => toggleOpen(stage.id)}>
           <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`} />
           <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${STAGE_DOT[stage.status]}`} />
-          <span className="text-sm font-semibold">{stage.name}</span>
+          <span className="text-sm font-semibold line-clamp-2">{stage.name}</span>
         </div>
       ),
-      bar: <div className="flex items-center gap-1.5 py-1 opacity-0 pointer-events-none" aria-hidden><ChevronRight className="w-3 h-3 flex-shrink-0" /><span className="text-sm">.</span></div>,
+      bar: <div className="h-12" />,
     });
     if (!isOpen) return;
     if (mainTasks.length === 0) {
@@ -1109,7 +1109,7 @@ function GanttView({ stages, tasks, openTasks, toggleOpen }: { stages: Stage[]; 
       </div>
 
       <div className="flex">
-        <div className="flex-shrink-0 bg-white pr-2 flex flex-col gap-y-1.5" style={{ width: "max-content" }}>
+        <div className="flex-shrink-0 bg-white pr-2 flex flex-col gap-y-1.5 w-80">
           <div className={showDailyRuler ? "h-7" : "h-4"} />
           {rows.map(r => <Fragment key={r.key}>{r.label}</Fragment>)}
         </div>
