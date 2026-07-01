@@ -130,34 +130,47 @@ export default function ProjectDetailPage() {
   };
 
   // ── Stage/task handlers ──
+  // These update local state immediately (optimistic) instead of writing then
+  // re-fetching everything, so the UI reacts instantly instead of waiting on
+  // two sequential round trips per click.
   const addStage = async (name: string) => {
     if (!name.trim()) return;
-    await fetch(`/api/projects/${id}/stages`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
-    loadStages();
+    const res = await fetch(`/api/projects/${id}/stages`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+    const stage = await res.json();
+    setStages(prev => [...prev, stage]);
   };
   const deleteStage = async (stageId: string) => {
     if (!confirm("Delete this stage and all its tasks?")) return;
-    await fetch(`/api/stages/${stageId}`, { method: "DELETE" }); loadStages();
+    setStages(prev => prev.filter(s => s.id !== stageId));
+    const removedTaskIds = new Set(tasks.filter(t => t.stageId === stageId).map(t => t.id));
+    setTasks(prev => prev.filter(t => t.stageId !== stageId));
+    setComments(prev => prev.filter(c => !removedTaskIds.has(c.taskId)));
+    fetch(`/api/stages/${stageId}`, { method: "DELETE" });
   };
   const patchStage = async (stageId: string, values: Partial<Stage>) => {
-    await fetch(`/api/stages/${stageId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
-    loadStages();
+    setStages(prev => prev.map(s => s.id === stageId ? { ...s, ...values } : s));
+    fetch(`/api/stages/${stageId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
   };
   const addTask = async (stageId: string, parentId: string | null, title: string) => {
     if (!title.trim()) return;
-    await fetch(`/api/stages/${stageId}/tasks`, {
+    setAddingTaskFor(null);
+    const res = await fetch(`/api/stages/${stageId}/tasks`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title, parentId }),
     });
-    setAddingTaskFor(null); loadStages();
+    const task = await res.json();
+    setTasks(prev => [...prev, task]);
   };
   const deleteTask = async (taskId: string) => {
     if (!confirm("Delete this task?")) return;
-    await fetch(`/api/plan-tasks/${taskId}`, { method: "DELETE" }); loadStages();
+    const removedIds = new Set([taskId, ...tasks.filter(t => t.parentId === taskId).map(t => t.id)]);
+    setTasks(prev => prev.filter(t => !removedIds.has(t.id)));
+    setComments(prev => prev.filter(c => !removedIds.has(c.taskId)));
+    fetch(`/api/plan-tasks/${taskId}`, { method: "DELETE" });
   };
   const patchTask = async (taskId: string, values: Partial<PlanTask>) => {
-    await fetch(`/api/plan-tasks/${taskId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
-    loadStages();
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...values } : t));
+    fetch(`/api/plan-tasks/${taskId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
   };
   const toggleMilestone = (task: PlanTask) => patchTask(task.id, { isMilestone: !task.isMilestone });
   const toggleOpen = (taskId: string) => setOpenTasks(prev => { const s = new Set(prev); s.has(taskId) ? s.delete(taskId) : s.add(taskId); return s; });
@@ -168,14 +181,16 @@ export default function ProjectDetailPage() {
 
   const submitRemark = async (taskId: string, text: string) => {
     if (!text.trim()) return;
-    await fetch(`/api/plan-tasks/${taskId}/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
-    loadStages();
+    const res = await fetch(`/api/plan-tasks/${taskId}/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+    const comment = await res.json();
+    setComments(prev => [...prev, comment]);
   };
   const attachPhoto = async (taskId: string) => {
     const url = prompt("Photo URL (placeholder — no file storage wired up yet)");
     if (!url) return;
-    await fetch(`/api/plan-tasks/${taskId}/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageUrl: url, text: null }) });
-    loadStages();
+    const res = await fetch(`/api/plan-tasks/${taskId}/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageUrl: url, text: null }) });
+    const comment = await res.json();
+    setComments(prev => [...prev, comment]);
   };
 
   // ── Finance handlers ──
