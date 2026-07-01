@@ -80,8 +80,9 @@ function parseBulkStatus(raw: string): StageStatus | undefined {
 // Mirrors the server's inferStatus() in app/api/projects/[id]/bulk-import/route.ts, used only to
 // preview what status a row will get when no explicit status column is provided.
 function inferBulkStatus(actualStart: string | null, actualEnd: string | null): StageStatus {
-  if (actualEnd) return "done";
-  if (actualStart) return "in_progress";
+  const today = new Date().toISOString().slice(0, 10);
+  if (actualEnd && actualEnd <= today) return "done";
+  if (actualStart && actualStart <= today) return "in_progress";
   return "pending";
 }
 

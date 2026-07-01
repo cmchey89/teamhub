@@ -10,8 +10,9 @@ interface BulkTask { title: string; planStart: string | null; planEnd: string | 
 interface BulkStage { name: string; tasks: BulkTask[] }
 
 function inferStatus(actualStart: string | null, actualEnd: string | null): "pending" | "in_progress" | "done" {
-  if (actualEnd) return "done";
-  if (actualStart) return "in_progress";
+  const today = new Date().toISOString().slice(0, 10);
+  if (actualEnd && actualEnd <= today) return "done";
+  if (actualStart && actualStart <= today) return "in_progress";
   return "pending";
 }
 
