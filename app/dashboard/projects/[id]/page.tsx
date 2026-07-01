@@ -812,7 +812,7 @@ function TaskTree(props: {
       </div>
 
       {taskView === "timeline" ? (
-        <GanttView stages={stages} tasks={tasks} />
+        <GanttView stages={stages} tasks={tasks} openTasks={openTasks} toggleOpen={toggleOpen} />
       ) : (
       <div className="overflow-x-auto">
       <div className="border border-gray-200 rounded-xl overflow-hidden">
@@ -882,7 +882,11 @@ function TaskTree(props: {
 
 // ── Gantt / Timeline view ────────────────────────────────────────────────
 
-function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
+function GanttView({ stages, tasks, openTasks, toggleOpen }: { stages: Stage[]; tasks: PlanTask[]; openTasks: Set<string>; toggleOpen: (id: string) => void }) {
+  const [focusMode, setFocusMode] = useState(false);
+  const [showPast, setShowPast] = useState(false);
+  const [showFuture, setShowFuture] = useState(false);
+
   const allDates: number[] = [];
   for (const s of stages) {
     if (s.planStart) allDates.push(new Date(s.planStart).getTime());
@@ -896,7 +900,7 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
   const today = Date.now();
 
   if (allDates.length === 0) {
-    return <p className="text-sm text-gray-400 text-center py-12 border border-gray-200 rounded-xl">No planned dates yet — add plan start/end dates in List view to see the timeline.</p>;
+    return <p className="text-sm text-gray-400 text-center py-12 border border-gray-200 rounded-xl">No planned dates yet — add plan start/end dates in Plan view to see the timeline.</p>;
   }
 
   const rangeStart = Math.min(...allDates, today);
@@ -909,10 +913,7 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
   const ticks = 5;
   const tickDates = Array.from({ length: ticks + 1 }, (_, i) => new Date(rangeStart + (span * i) / ticks));
 
-  // RAG (red/amber/green) risk model:
-  //  - risk (red): planned end already passed and still not done
-  //  - warning (yellow): in progress with <2 days left, or should have started but hasn't
-  //  - on track (green): done, or in progress/pending with no risk signal
+  // RAG risk model, bumped to more saturated tones for presentation visibility.
   const WARNING_WINDOW_MS = 2 * 86400000;
   const taskRisk = (t: PlanTask): "risk" | "warning" | "ontrack" => {
     if (t.status === "done") return "ontrack";
@@ -923,22 +924,92 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
     if (t.status === "in_progress" && planEndMs !== null && planEndMs - today <= WARNING_WINDOW_MS) return "warning";
     return "ontrack";
   };
-  const RISK_COLOR = { risk: "#E24B4A", warning: "#D9A404", ontrack: "#639922" } as const;
+  const RISK_COLOR = { risk: "#DC2626", warning: "#F59E0B", ontrack: "#16A34A" } as const;
+  const CURRENT_COLOR = "#2563EB";
   const barColor = (t: PlanTask) => RISK_COLOR[taskRisk(t)];
+
+  // Find the "current" stage (first not-done) and "next" stage (the one right after it) for Focus mode.
+  const currentStageIdx = stages.findIndex(s => s.status !== "done");
+  const currentStageId = currentStageIdx >= 0 ? stages[currentStageIdx].id : null;
+  const nextStageId = currentStageIdx >= 0 && currentStageIdx + 1 < stages.length ? stages[currentStageIdx + 1].id : null;
+  const pastStages = currentStageIdx >= 0 ? stages.slice(0, currentStageIdx) : [];
+  const futureStages = currentStageIdx >= 0 ? stages.slice(currentStageIdx + 2) : [];
+
+  const renderTaskBar = (t: PlanTask, dim: boolean) => {
+    const planL = pct(t.planStart), planR = pct(t.planEnd);
+    const actL = pct(t.actualStart) ?? planL, actR = pct(t.actualEnd) ?? (t.status === "done" ? planR : (planL !== null ? Math.min(todayPct, 100) : null));
+    const hasChildren = !t.parentId && tasks.some(x => x.parentId === t.id);
+    return (
+      <div key={t.id}>
+        <div className={`flex items-center gap-0 mb-1.5 ${t.parentId ? "pl-6" : ""} ${dim ? "opacity-50" : ""}`} style={{ height: 22 }}>
+          <div className="w-40 flex-shrink-0 text-sm flex items-center gap-1 truncate pr-2 cursor-pointer" onClick={() => hasChildren && toggleOpen(t.id)}>
+            {hasChildren && <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(t.id) ? "rotate-90" : ""}`} />}
+            {t.isMilestone ? <span className="w-1.5 h-1.5 rotate-45 flex-shrink-0" style={{ background: "#9333EA" }} /> : <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-gray-300" />}
+            <span className={`truncate ${t.isMilestone ? "text-purple-700 font-medium" : t.parentId ? "text-gray-500" : "text-gray-700"}`}>{t.title}</span>
+          </div>
+          <div className="flex-1 relative h-5">
+            <div className="absolute top-2 left-0 right-0 h-1.5 bg-gray-100 rounded" />
+            {planL !== null && planR !== null && (
+              <div className="absolute top-2 h-1.5 rounded bg-gray-300" style={{ left: `${planL}%`, width: `${Math.max(planR - planL, 0.5)}%` }} />
+            )}
+            {actL !== null && actR !== null && (
+              <div className="absolute top-2 h-1.5 rounded" style={{ left: `${actL}%`, width: `${Math.max(actR - actL, 0.5)}%`, background: t.status === "in_progress" && !dim ? CURRENT_COLOR : barColor(t) }} />
+            )}
+            {actR !== null && (
+              t.isMilestone
+                ? <div className="absolute top-[5px] w-2.5 h-2.5 rotate-45 -translate-x-1/2 border-2 border-white shadow" style={{ left: `${actR}%`, background: barColor(t) }} />
+                : <div className="absolute top-[5px] w-2.5 h-2.5 rounded-full -translate-x-1/2 border-2 border-white shadow" style={{ left: `${actR}%`, background: t.status === "in_progress" && !dim ? CURRENT_COLOR : barColor(t) }} />
+            )}
+          </div>
+          <div className="w-20 flex-shrink-0 text-sm text-right font-medium" style={{ color: t.status === "in_progress" && !dim ? CURRENT_COLOR : RISK_COLOR[taskRisk(t)] }}>
+            {t.status === "done" ? `Done ${fmtDate(t.actualEnd)}` : taskRisk(t) === "risk" ? "Overdue" : taskRisk(t) === "warning" ? "Warning" : t.status === "in_progress" ? "In progress" : "Pending"}
+          </div>
+        </div>
+        {hasChildren && openTasks.has(t.id) && tasks.filter(x => x.parentId === t.id).map(st => renderTaskBar(st, dim))}
+      </div>
+    );
+  };
+
+  const renderStage = (stage: Stage, opts: { badge?: "current" | "next"; dim?: boolean }) => {
+    const mainTasks = tasks.filter(t => t.stageId === stage.id && !t.parentId);
+    const isOpen = opts.badge ? true : openTasks.has(stage.id);
+    return (
+      <div key={stage.id} className={`mb-3 rounded-lg ${opts.badge === "current" ? "border-2 p-2.5 -mx-2.5" : opts.badge === "next" ? "border p-2 -mx-2" : ""}`}
+        style={opts.badge === "current" ? { borderColor: CURRENT_COLOR, background: "#EFF6FF" } : opts.badge === "next" ? { borderColor: "#C4B5FD", background: "#FAF5FF" } : undefined}>
+        <div className="flex items-center gap-1.5 mb-1.5 cursor-pointer" onClick={() => !opts.badge && toggleOpen(stage.id)}>
+          {!opts.badge && <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`} />}
+          <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${STAGE_DOT[stage.status]}`} />
+          <span className="text-sm font-semibold">{stage.name}</span>
+          {opts.badge === "current" && <span className="text-[11px] font-bold text-white px-2 py-0.5 rounded-full animate-pulse" style={{ background: CURRENT_COLOR }}>● CURRENT</span>}
+          {opts.badge === "next" && <span className="text-[11px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">NEXT UP</span>}
+        </div>
+        {isOpen && (mainTasks.length === 0
+          ? <p className="text-sm text-gray-400 pl-4">No tasks yet.</p>
+          : mainTasks.map(t => renderTaskBar(t, !!opts.dim)))}
+      </div>
+    );
+  };
 
   return (
     <div className="border border-gray-200 rounded-xl p-4">
-      <div className="flex gap-4 mb-3 text-sm text-gray-500">
-        <span className="flex items-center gap-1"><span className="w-3 h-1 rounded bg-gray-300 inline-block" /> Planned</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: RISK_COLOR.ontrack }} /> On track</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: RISK_COLOR.warning }} /> Warning</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: RISK_COLOR.risk }} /> Risk</span>
-        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rotate-45 inline-block" style={{ background: "#9333EA" }} /> Milestone</span>
-        <span className="flex items-center gap-1"><span className="w-px h-3 inline-block bg-blue-500" /> Today</span>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex gap-4 text-sm text-gray-500 flex-wrap">
+          <span className="flex items-center gap-1"><span className="w-3 h-1 rounded bg-gray-300 inline-block" /> Planned</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: RISK_COLOR.ontrack }} /> On track</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: CURRENT_COLOR }} /> In progress</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: RISK_COLOR.warning }} /> Warning</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: RISK_COLOR.risk }} /> Risk</span>
+          <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rotate-45 inline-block" style={{ background: "#9333EA" }} /> Milestone</span>
+          <span className="flex items-center gap-1"><span className="w-px h-3 inline-block bg-blue-500" /> Today</span>
+        </div>
+        <button onClick={() => setFocusMode(f => !f)}
+          className={`text-[11px] font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 ${focusMode ? "text-white" : "border border-gray-300 text-gray-600 hover:bg-gray-50"}`}
+          style={focusMode ? { background: CURRENT_COLOR } : undefined}>
+          {focusMode ? "✓ Focus mode" : "Focus mode (current + next)"}
+        </button>
       </div>
 
       <div className="relative">
-        {/* Today line spans the full height of the ruler + rows below, aligned to the bar-area column (offset past the w-36 label column). */}
         <div className="absolute left-36 right-0 top-0 bottom-0 pointer-events-none z-10">
           {todayPct >= 0 && todayPct <= 100 && (
             <div className="absolute top-0 bottom-0 w-px bg-blue-500" style={{ left: `${todayPct}%` }} />
@@ -956,48 +1027,32 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
           </div>
         </div>
 
-        {stages.map(stage => {
-        const mainTasks = tasks.filter(t => t.stageId === stage.id && !t.parentId);
-        return (
-          <div key={stage.id} className="mb-4">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STAGE_DOT[stage.status]}`} />
-              <span className="text-sm font-medium">{stage.name}</span>
-            </div>
-            {mainTasks.length === 0 ? (
-              <p className="text-sm text-gray-400 pl-4">No tasks yet.</p>
-            ) : mainTasks.map(t => {
-              const planL = pct(t.planStart), planR = pct(t.planEnd);
-              const actL = pct(t.actualStart) ?? planL, actR = pct(t.actualEnd) ?? (t.status === "done" ? planR : (planL !== null ? Math.min(todayPct, 100) : null));
-              return (
-                <div key={t.id} className="flex items-center gap-0 mb-1.5" style={{ height: 20 }}>
-                  <div className="w-36 flex-shrink-0 text-sm flex items-center gap-1 truncate pr-2">
-                    {t.isMilestone ? <span className="w-1.5 h-1.5 rotate-45 flex-shrink-0" style={{ background: "#9333EA" }} /> : <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-gray-300" />}
-                    <span className={`truncate ${t.isMilestone ? "text-purple-700" : "text-gray-600"}`}>{t.title}</span>
-                  </div>
-                  <div className="flex-1 relative h-5">
-                    <div className="absolute top-2 left-0 right-0 h-1 bg-gray-100 rounded" />
-                    {planL !== null && planR !== null && (
-                      <div className="absolute top-2 h-1 rounded bg-gray-300" style={{ left: `${planL}%`, width: `${Math.max(planR - planL, 0.5)}%` }} />
-                    )}
-                    {actL !== null && actR !== null && (
-                      <div className="absolute top-2 h-1 rounded" style={{ left: `${actL}%`, width: `${Math.max(actR - actL, 0.5)}%`, background: barColor(t) }} />
-                    )}
-                    {actR !== null && (
-                      t.isMilestone
-                        ? <div className="absolute top-[6px] w-2 h-2 rotate-45 -translate-x-1/2 border border-white" style={{ left: `${actR}%`, background: barColor(t) }} />
-                        : <div className="absolute top-[6px] w-2 h-2 rounded-full -translate-x-1/2 border border-white" style={{ left: `${actR}%`, background: barColor(t) }} />
-                    )}
-                  </div>
-                  <div className="w-14 flex-shrink-0 text-sm text-right" style={{ color: RISK_COLOR[taskRisk(t)] }}>
-                    {t.status === "done" ? `Done ${fmtDate(t.actualEnd)}` : taskRisk(t) === "risk" ? "Overdue" : taskRisk(t) === "warning" ? "Warning" : t.status === "in_progress" ? "In progress" : "Pending"}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
+        {!focusMode && stages.map(stage => renderStage(stage, {}))}
+
+        {focusMode && (
+          <>
+            {pastStages.length > 0 && (
+              <button onClick={() => setShowPast(v => !v)} className="w-full text-left text-sm text-gray-400 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 hover:bg-gray-100">
+                {showPast ? "▾" : "▸"} ✓ {pastStages.length} stage{pastStages.length > 1 ? "s" : ""} completed
+              </button>
+            )}
+            {showPast && pastStages.map(stage => renderStage(stage, { dim: true }))}
+
+            {currentStageId && renderStage(stages.find(s => s.id === currentStageId)!, { badge: "current" })}
+            {nextStageId && renderStage(stages.find(s => s.id === nextStageId)!, { badge: "next", dim: true })}
+
+            {futureStages.length > 0 && (
+              <button onClick={() => setShowFuture(v => !v)} className="w-full text-left text-sm text-gray-400 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 hover:bg-gray-100">
+                {showFuture ? "▾" : "▸"} {futureStages.length} more stage{futureStages.length > 1 ? "s" : ""} upcoming
+              </button>
+            )}
+            {showFuture && futureStages.map(stage => renderStage(stage, { dim: true }))}
+
+            {!currentStageId && stages.every(s => s.status === "done") && (
+              <p className="text-sm text-center py-6 font-medium" style={{ color: RISK_COLOR.ontrack }}>🎉 All stages completed</p>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
