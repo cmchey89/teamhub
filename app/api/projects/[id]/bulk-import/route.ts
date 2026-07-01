@@ -4,9 +4,15 @@ import { db } from "../../../../../lib/db/client";
 import { projectStages, planTasks } from "../../../../../lib/db/schema";
 import { eq } from "drizzle-orm";
 
-interface BulkSubTask { title: string; planStart: string | null; planEnd: string | null }
-interface BulkTask { title: string; planStart: string | null; planEnd: string | null; subTasks: BulkSubTask[] }
+interface BulkSubTask { title: string; planStart: string | null; planEnd: string | null; actualStart: string | null; actualEnd: string | null }
+interface BulkTask { title: string; planStart: string | null; planEnd: string | null; actualStart: string | null; actualEnd: string | null; subTasks: BulkSubTask[] }
 interface BulkStage { name: string; tasks: BulkTask[] }
+
+function inferStatus(actualStart: string | null, actualEnd: string | null): "pending" | "in_progress" | "done" {
+  if (actualEnd) return "done";
+  if (actualStart) return "in_progress";
+  return "pending";
+}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = getSessionFromRequest(req);
@@ -20,13 +26,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let stagesCreated = 0, mainCreated = 0, subCreated = 0;
 
   for (const stage of stages) {
-    const allDates = stage.tasks.flatMap(t => [t.planStart, t.planEnd]).filter((d): d is string => !!d);
-    const stagePlanStart = allDates.length ? allDates.reduce((a, b) => (a < b ? a : b)) : null;
-    const stagePlanEnd = allDates.length ? allDates.reduce((a, b) => (a > b ? a : b)) : null;
+    const planDates = stage.tasks.flatMap(t => [t.planStart, t.planEnd]).filter((d): d is string => !!d);
+    const actualDates = stage.tasks.flatMap(t => [t.actualStart, t.actualEnd]).filter((d): d is string => !!d);
+    const stagePlanStart = planDates.length ? planDates.reduce((a, b) => (a < b ? a : b)) : null;
+    const stagePlanEnd = planDates.length ? planDates.reduce((a, b) => (a > b ? a : b)) : null;
+    const stageActualStart = actualDates.length ? actualDates.reduce((a, b) => (a < b ? a : b)) : null;
+    const stageActualEnd = actualDates.length ? actualDates.reduce((a, b) => (a > b ? a : b)) : null;
 
     const [createdStage] = await db.insert(projectStages).values({
       projectId: id, name: stage.name, sortOrder: sortOrder++,
       planStart: stagePlanStart, planEnd: stagePlanEnd,
+      actualStart: stageActualStart, actualEnd: stageActualEnd,
     }).returning();
     stagesCreated++;
 
@@ -36,6 +46,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         stageId: createdStage.id, parentId: null,
         title: task.title, sortOrder: taskSort++,
         planStart: task.planStart, planEnd: task.planEnd,
+        actualStart: task.actualStart, actualEnd: task.actualEnd,
+        status: inferStatus(task.actualStart, task.actualEnd),
       }).returning();
       mainCreated++;
 
@@ -45,6 +57,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           stageId: createdStage.id, parentId: createdTask.id,
           title: sub.title, sortOrder: subSort++,
           planStart: sub.planStart, planEnd: sub.planEnd,
+          actualStart: sub.actualStart, actualEnd: sub.actualEnd,
+          status: inferStatus(sub.actualStart, sub.actualEnd),
         });
         subCreated++;
       }

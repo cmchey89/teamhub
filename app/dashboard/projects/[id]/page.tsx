@@ -47,8 +47,8 @@ type DragCtl = {
   startDrag: (kind: "stage" | "task", id: string) => void;
 };
 
-interface BulkSubTask { title: string; planStart: string | null; planEnd: string | null }
-interface BulkTask { title: string; planStart: string | null; planEnd: string | null; subTasks: BulkSubTask[] }
+interface BulkSubTask { title: string; planStart: string | null; planEnd: string | null; actualStart: string | null; actualEnd: string | null }
+interface BulkTask { title: string; planStart: string | null; planEnd: string | null; actualStart: string | null; actualEnd: string | null; subTasks: BulkSubTask[] }
 interface BulkStage { name: string; tasks: BulkTask[] }
 
 const MONTH_LOOKUP: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
@@ -77,15 +77,16 @@ function parseBulkText(text: string): { stages: BulkStage[]; errors: string[] } 
   const errors: string[] = [];
 
   lines.forEach((line, i) => {
-    const delim = line.includes("\t") ? "\t" : "|";
-    const parts = line.split(delim).map(p => p.trim());
+    const parts = line.split("|").map(p => p.trim());
     const level = parseInt(parts[0], 10);
     const title = parts[1] || "";
     const planStart = parseFlexibleDate(parts[2] || "");
     const planEnd = parseFlexibleDate(parts[3] || "");
+    const actualStart = parseFlexibleDate(parts[4] || "");
+    const actualEnd = parseFlexibleDate(parts[5] || "");
 
     if (![1, 2, 3].includes(level) || !title) {
-      errors.push(`Line ${i + 1}: couldn't read "${line}" — expected "1/2/3, title[, plan start[, plan end]]"`);
+      errors.push(`Line ${i + 1}: couldn't read "${line}" — expected "1/2/3 | title | plan start | plan end | actual start | actual end"`);
       return;
     }
     if (level === 1) {
@@ -94,11 +95,11 @@ function parseBulkText(text: string): { stages: BulkStage[]; errors: string[] } 
       currentTask = null;
     } else if (level === 2) {
       if (!currentStage) { errors.push(`Line ${i + 1}: main task "${title}" has no stage above it`); return; }
-      currentTask = { title, planStart, planEnd, subTasks: [] };
+      currentTask = { title, planStart, planEnd, actualStart, actualEnd, subTasks: [] };
       currentStage.tasks.push(currentTask);
     } else {
       if (!currentTask) { errors.push(`Line ${i + 1}: sub task "${title}" has no main task above it`); return; }
-      currentTask.subTasks.push({ title, planStart, planEnd });
+      currentTask.subTasks.push({ title, planStart, planEnd, actualStart, actualEnd });
     }
   });
 
@@ -112,6 +113,9 @@ const CLAIM_COLORS: Record<ClaimStatus, string> = {
   paid: "bg-green-100 text-green-700",
 };
 const STAGE_DOT: Record<StageStatus, string> = { pending: "bg-gray-300", in_progress: "bg-amber-500", done: "bg-green-600" };
+const TAB_LABELS: Record<"background" | "plan" | "stages" | "finance", string> = {
+  background: "Background", plan: "Plan", stages: "Task breakdown", finance: "Finance",
+};
 
 function fmtMoney(n: number) { return `$${n.toLocaleString()}`; }
 function fmtDate(d: string | null) { return d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "—"; }
@@ -472,8 +476,8 @@ export default function ProjectDetailPage() {
       <div className="flex border-b border-gray-200 mb-6">
         {(["background", "plan", "stages", "finance"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm capitalize -mb-px border-b-2 ${tab === t ? "border-blue-600 text-blue-600 font-medium" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
-            {t}
+            className={`px-4 py-2 text-sm -mb-px border-b-2 ${tab === t ? "border-blue-600 text-blue-600 font-medium" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+            {TAB_LABELS[t]}
           </button>
         ))}
       </div>
@@ -484,7 +488,6 @@ export default function ProjectDetailPage() {
           files={files} addFile={addFile}
           stages={stages} tasks={tasks}
           openTasks={openTasks} toggleOpen={toggleOpen}
-          taskView={taskView} setTaskView={setTaskView}
         />
       )}
 
@@ -512,6 +515,7 @@ export default function ProjectDetailPage() {
           patchTask={patchTask} patchStage={patchStage}
           addStage={addStage} deleteStage={deleteStage}
           dragging={dragging} hoverId={hoverId} startDrag={startDrag}
+          taskView={taskView} setTaskView={setTaskView}
         />
       )}
 
@@ -616,9 +620,8 @@ function BackgroundTab(props: {
   files: ProjFile[]; addFile: () => void;
   stages: Stage[]; tasks: PlanTask[];
   openTasks: Set<string>; toggleOpen: (id: string) => void;
-  taskView: "list" | "timeline"; setTaskView: (v: "list" | "timeline") => void;
 }) {
-  const { bg, bgForm, setBgForm, editing, setEditing, save, files, addFile, stages, tasks, openTasks, toggleOpen, taskView, setTaskView } = props;
+  const { bg, bgForm, setBgForm, editing, setEditing, save, files, addFile, stages, tasks, openTasks, toggleOpen } = props;
   return (
     <div>
       <div className="grid grid-cols-2 gap-4 mb-6">
@@ -674,18 +677,8 @@ function BackgroundTab(props: {
       </div>
 
       <div className="border-t border-gray-100 pt-5">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Task breakdown (read-only — edit in the Plan tab)</p>
-          <div className="flex border border-gray-200 rounded-lg overflow-hidden text-xs">
-            <button onClick={() => setTaskView("list")} className={`px-2.5 py-1 ${taskView === "list" ? "bg-gray-100 font-medium text-gray-900" : "text-gray-400"}`}>List</button>
-            <button onClick={() => setTaskView("timeline")} className={`px-2.5 py-1 border-l border-gray-200 ${taskView === "timeline" ? "bg-gray-100 font-medium text-gray-900" : "text-gray-400"}`}>Timeline</button>
-          </div>
-        </div>
-        {taskView === "timeline" ? (
-          <GanttView stages={stages} tasks={tasks} />
-        ) : (
-          <ReadOnlyTaskTree stages={stages} tasks={tasks} openTasks={openTasks} toggleOpen={toggleOpen} />
-        )}
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Task breakdown (read-only — edit in the Plan tab, timeline is in Task breakdown tab)</p>
+        <ReadOnlyTaskTree stages={stages} tasks={tasks} openTasks={openTasks} toggleOpen={toggleOpen} />
       </div>
     </div>
   );
@@ -1139,24 +1132,37 @@ function StagesTab(props: {
   submitRemark: (taskId: string, text: string) => void; attachPhoto: (id: string) => void;
   patchTask: (id: string, v: Partial<PlanTask>) => void; patchStage: (id: string, v: Partial<Stage>) => void;
   addStage: (name: string) => void; deleteStage: (id: string) => void;
+  taskView: "list" | "timeline"; setTaskView: (v: "list" | "timeline") => void;
 } & DragCtl) {
   const {
     stages, tasks, comments, openTasks, toggleOpen, expandAllTasks, collapseAllTasks,
     openComments, toggleComments, closeAllComments, submitRemark, attachPhoto, patchTask, patchStage,
-    addStage, deleteStage, dragging, hoverId, startDrag,
+    addStage, deleteStage, dragging, hoverId, startDrag, taskView, setTaskView,
   } = props;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs text-gray-400">Planned dates come from Background. Log actual dates as work progresses. Click <MessageSquare className="w-3 h-3 inline" /> to add remarks.</p>
-        <div className="flex gap-2 flex-shrink-0">
-          <button onClick={expandAllTasks} className="text-xs border border-gray-300 rounded px-2 py-1">Expand all</button>
-          <button onClick={collapseAllTasks} className="text-xs border border-gray-300 rounded px-2 py-1">Collapse all</button>
-          <button onClick={closeAllComments} className="text-xs border border-gray-300 rounded px-2 py-1">Close remarks</button>
+        <p className="text-xs text-gray-400">Log actual dates and status as work progresses. Click <MessageSquare className="w-3 h-3 inline" /> to add remarks.</p>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex border border-gray-200 rounded-lg overflow-hidden text-xs">
+            <button onClick={() => setTaskView("list")} className={`px-2.5 py-1 ${taskView === "list" ? "bg-gray-100 font-medium text-gray-900" : "text-gray-400"}`}>List</button>
+            <button onClick={() => setTaskView("timeline")} className={`px-2.5 py-1 border-l border-gray-200 ${taskView === "timeline" ? "bg-gray-100 font-medium text-gray-900" : "text-gray-400"}`}>Timeline</button>
+          </div>
+          {taskView === "list" && (
+            <>
+              <button onClick={expandAllTasks} className="text-xs border border-gray-300 rounded px-2 py-1">Expand all</button>
+              <button onClick={collapseAllTasks} className="text-xs border border-gray-300 rounded px-2 py-1">Collapse all</button>
+              <button onClick={closeAllComments} className="text-xs border border-gray-300 rounded px-2 py-1">Close remarks</button>
+            </>
+          )}
         </div>
       </div>
 
+      {taskView === "timeline" ? (
+        <GanttView stages={stages} tasks={tasks} />
+      ) : (
+      <>
       {stages.length === 0 && <p className="text-sm text-gray-400 text-center py-10">No stages yet — add one below.</p>}
 
       {stages.map(stage => {
@@ -1187,6 +1193,8 @@ function StagesTab(props: {
       })}
 
       <AddStageRow addStage={addStage} />
+      </>
+      )}
     </div>
   );
 }
@@ -1208,7 +1216,13 @@ function StageMainTask({ task, subTasks, comments, openTasks, toggleOpen, openCo
         <span className={`w-1.5 h-1.5 rotate-45 flex-shrink-0 ${task.isMilestone ? "bg-purple-600" : "bg-gray-400"}`} />
         <EditableName value={task.title} onSave={v => patchTask(task.id, { title: v })} className="text-xs flex-1" />
         {task.isMilestone && <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">Milestone</span>}
-        <span className="text-[10px] text-gray-400 flex-shrink-0">{fmtDate(task.planStart)} – {fmtDate(task.planEnd)}</span>
+        <span className="text-[10px] text-gray-400 flex-shrink-0">Plan: {fmtDate(task.planStart)}–{fmtDate(task.planEnd)}</span>
+        <span className="flex items-center gap-0.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+          <span className="text-[10px] text-blue-500">Actual:</span>
+          <DateCell value={task.actualStart} onChange={v => patchTask(task.id, { actualStart: v })} accent />
+          <span className="text-[10px] text-gray-300">–</span>
+          <DateCell value={task.actualEnd} onChange={v => patchTask(task.id, { actualEnd: v })} accent />
+        </span>
         <select value={task.status} onChange={e => { e.stopPropagation(); patchTask(task.id, { status: e.target.value as StageStatus }); }} onClick={e => e.stopPropagation()}
           className="text-[10px] border border-gray-200 rounded px-1 py-0.5">
           <option value="pending">Pending</option>
@@ -1228,7 +1242,13 @@ function StageMainTask({ task, subTasks, comments, openTasks, toggleOpen, openCo
               className={`flex items-center gap-2 pl-8 pr-3 py-1.5 border-b border-gray-200 select-none ${dragging?.id === st.id ? "opacity-40" : "bg-gray-50"} ${hoverId === st.id && dragging && dragging.id !== st.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}>
               <span className="w-1.5 h-[1.5px] bg-gray-300 flex-shrink-0" />
               <EditableName value={st.title} onSave={v => patchTask(st.id, { title: v })} className="text-xs text-gray-500 flex-1" />
-              <span className="text-[10px] text-gray-400 flex-shrink-0">{fmtDate(st.planStart)} – {fmtDate(st.planEnd)}</span>
+              <span className="text-[10px] text-gray-400 flex-shrink-0">Plan: {fmtDate(st.planStart)}–{fmtDate(st.planEnd)}</span>
+              <span className="flex items-center gap-0.5 flex-shrink-0">
+                <span className="text-[10px] text-blue-500">Actual:</span>
+                <DateCell value={st.actualStart} onChange={v => patchTask(st.id, { actualStart: v })} accent />
+                <span className="text-[10px] text-gray-300">–</span>
+                <DateCell value={st.actualEnd} onChange={v => patchTask(st.id, { actualEnd: v })} accent />
+              </span>
               <button onClick={() => toggleComments(st.id)} className={`w-5 h-5 border rounded flex items-center justify-center flex-shrink-0 ${openComments.has(st.id) || stComments.length ? "border-blue-400 text-blue-600 bg-blue-50" : "border-gray-200 text-gray-400"}`}><MessageSquare className="w-3 h-3" /></button>
             </div>
             {openComments.has(st.id) && (
@@ -1408,12 +1428,11 @@ function BulkImportModal({ onClose, onImport }: { onClose: () => void; onImport:
       {!parsed ? (
         <>
           <p className="text-xs text-gray-500 mb-2">
-            One line per row: <b>1</b> = stage, <b>2</b> = main task, <b>3</b> = sub task, then title, then optional plan start/end dates.
-            Paste directly from Excel (columns come through as tabs automatically), or type using <code className="bg-gray-100 px-1 rounded">|</code> as the separator.
+            One line per row, separated by <code className="bg-gray-100 px-1 rounded">|</code>: <b>level</b> (1=stage, 2=main task, 3=sub task) | <b>title</b> | plan start | plan end | actual start | actual end. Dates are optional.
           </p>
           <pre className="text-[10px] bg-gray-50 border border-gray-200 rounded-lg p-2 mb-2 whitespace-pre-wrap text-gray-500 leading-relaxed">
 {`1 | Pre-Quotation
-2 | Initiate discussion on requirements | 10-Sep-25 | 17-Sep-25
+2 | Initiate discussion on requirements | 10-Sep-25 | 17-Sep-25 | 10-Sep-25 | 17-Sep-25
 3 | Receive query on affected infra
 2 | Next main task | 20-Sep-25 | 25-Sep-25`}
           </pre>
@@ -1442,10 +1461,16 @@ function BulkImportModal({ onClose, onImport }: { onClose: () => void; onImport:
                 {s.tasks.map((t, j) => (
                   <div key={j}>
                     <div className="px-5 py-1 text-xs border-b border-gray-100">
-                      {t.title} {t.planStart && <span className="text-gray-400">({fmtDate(t.planStart)} – {fmtDate(t.planEnd)})</span>}
+                      {t.title}
+                      {t.planStart && <span className="text-gray-400"> plan: {fmtDate(t.planStart)}–{fmtDate(t.planEnd)}</span>}
+                      {t.actualStart && <span className="text-blue-500"> actual: {fmtDate(t.actualStart)}–{fmtDate(t.actualEnd)}</span>}
                     </div>
                     {t.subTasks.map((st, k) => (
-                      <div key={k} className="px-8 py-1 text-[11px] text-gray-500 border-b border-gray-100">{st.title}</div>
+                      <div key={k} className="px-8 py-1 text-[11px] text-gray-500 border-b border-gray-100">
+                        {st.title}
+                        {st.planStart && <span className="text-gray-400"> plan: {fmtDate(st.planStart)}–{fmtDate(st.planEnd)}</span>}
+                        {st.actualStart && <span className="text-blue-500"> actual: {fmtDate(st.actualStart)}–{fmtDate(st.actualEnd)}</span>}
+                      </div>
                     ))}
                   </div>
                 ))}
