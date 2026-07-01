@@ -13,6 +13,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ta
   if ("title" in body) values.title = body.title;
   if ("isMilestone" in body) values.isMilestone = !!body.isMilestone;
   if ("status" in body) values.status = body.status;
+  if ("stageId" in body) values.stageId = body.stageId;
+  if ("parentId" in body) values.parentId = body.parentId || null;
+  if ("sortOrder" in body) values.sortOrder = Number(body.sortOrder);
   for (const k of ["planStart", "planEnd", "actualStart", "actualEnd"]) {
     if (k in body) values[k] = body[k] || null;
   }

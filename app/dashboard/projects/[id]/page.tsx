@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -41,6 +41,12 @@ interface ClientClaim { id: string; stageId: string | null; amount: number; invo
 
 interface Template { id: string; name: string; team: string | null; structure: string; createdAt: string }
 
+type DragCtl = {
+  dragging: { kind: "stage" | "task"; id: string } | null;
+  hoverId: string | null;
+  startDrag: (kind: "stage" | "task", id: string) => void;
+};
+
 const CLAIM_COLORS: Record<ClaimStatus, string> = {
   pending: "bg-gray-100 text-gray-500",
   submitted: "bg-amber-100 text-amber-700",
@@ -51,6 +57,29 @@ const STAGE_DOT: Record<StageStatus, string> = { pending: "bg-gray-300", in_prog
 
 function fmtMoney(n: number) { return `$${n.toLocaleString()}`; }
 function fmtDate(d: string | null) { return d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "—"; }
+
+// Press and hold ~1s (without moving) to start a drag, so a normal click/tap
+// still works for opening rows or triggering rename. Movement before the
+// timer fires cancels it (treated as a scroll or misclick, not a drag).
+// Plain closure, not a hook, so it can be called fresh inside .map() callbacks.
+function longPressHandlers(onActivate: () => void, delay = 1000) {
+  let timer: number | null = null;
+  let start: { x: number; y: number } | null = null;
+  const clear = () => { if (timer !== null) { window.clearTimeout(timer); timer = null; } start = null; };
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.button !== 0) return;
+      start = { x: e.clientX, y: e.clientY };
+      timer = window.setTimeout(() => { onActivate(); clear(); }, delay);
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      if (!start) return;
+      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > 6) clear();
+    },
+    onPointerUp: clear,
+    onPointerLeave: clear,
+  };
+}
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -71,6 +100,9 @@ export default function ProjectDetailPage() {
   const [openComments, setOpenComments] = useState<Set<string>>(new Set());
   const [addingTaskFor, setAddingTaskFor] = useState<{ stageId: string; parentId: string | null } | null>(null);
   const [taskView, setTaskView] = useState<"list" | "timeline">("list");
+  const [dragging, setDragging] = useState<{ kind: "stage" | "task"; id: string } | null>(null);
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const hoverIdRef = useRef<string | null>(null);
 
   // finance
   const [contractors, setContractors] = useState<Contractor[]>([]);
@@ -197,6 +229,93 @@ export default function ProjectDetailPage() {
   const expandAllTasks = () => setOpenTasks(new Set(tasks.filter(t => !t.parentId).map(t => t.id)));
   const collapseAllTasks = () => setOpenTasks(new Set());
 
+  // ── Press-and-hold drag to reorder/move stages, main tasks, and sub tasks ──
+  const startDrag = (kind: "stage" | "task", id: string) => setDragging({ kind, id });
+
+  const moveStage = (stageId: string, beforeStageId: string | null) => {
+    setStages(prev => {
+      const dragged = prev.find(s => s.id === stageId);
+      if (!dragged) return prev;
+      const without = prev.filter(s => s.id !== stageId);
+      const idx = beforeStageId ? without.findIndex(s => s.id === beforeStageId) : -1;
+      const insertAt = idx === -1 ? without.length : idx;
+      const next = [...without.slice(0, insertAt), dragged, ...without.slice(insertAt)].map((s, i) => ({ ...s, sortOrder: i }));
+      next.forEach(s => fetch(`/api/stages/${s.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sortOrder: s.sortOrder }) }));
+      return next;
+    });
+  };
+
+  const moveTask = (taskId: string, newStageId: string, newParentId: string | null, beforeTaskId: string | null) => {
+    setTasks(prev => {
+      const dragged = prev.find(t => t.id === taskId);
+      if (!dragged) return prev;
+      const moved = { ...dragged, stageId: newStageId, parentId: newParentId };
+      const rest = prev.filter(t => t.id !== taskId);
+      const group = rest.filter(t => t.stageId === newStageId && t.parentId === newParentId);
+      const untouched = rest.filter(t => !(t.stageId === newStageId && t.parentId === newParentId));
+      const idx = beforeTaskId ? group.findIndex(t => t.id === beforeTaskId) : -1;
+      const insertAt = idx === -1 ? group.length : idx;
+      const reorderedGroup = [...group.slice(0, insertAt), moved, ...group.slice(insertAt)].map((t, i) => ({ ...t, sortOrder: i }));
+      reorderedGroup.forEach(t => {
+        const body = t.id === taskId ? { stageId: newStageId, parentId: newParentId, sortOrder: t.sortOrder } : { sortOrder: t.sortOrder };
+        fetch(`/api/plan-tasks/${t.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      });
+      return [...untouched, ...reorderedGroup];
+    });
+  };
+
+  const handleDrop = (dragged: { kind: "stage" | "task"; id: string }, targetId: string) => {
+    if (dragged.kind === "stage") {
+      if (stages.some(s => s.id === targetId)) moveStage(dragged.id, targetId);
+      return;
+    }
+    const draggedTask = tasks.find(t => t.id === dragged.id);
+    if (!draggedTask) return;
+    const isDraggedMain = draggedTask.parentId === null;
+    const targetTask = tasks.find(t => t.id === targetId);
+    const targetStage = stages.find(s => s.id === targetId);
+
+    if (isDraggedMain) {
+      if (targetTask && targetTask.parentId === null) {
+        moveTask(draggedTask.id, targetTask.stageId, null, targetTask.id);
+      } else if (targetStage) {
+        moveTask(draggedTask.id, targetStage.id, null, null);
+      }
+    } else {
+      if (targetTask && targetTask.parentId !== null) {
+        const targetParent = tasks.find(t => t.id === targetTask.parentId);
+        if (targetParent) moveTask(draggedTask.id, targetParent.stageId, targetParent.id, targetTask.id);
+      } else if (targetTask && targetTask.parentId === null) {
+        moveTask(draggedTask.id, targetTask.stageId, targetTask.id, null);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e: PointerEvent) => {
+      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+      const target = el?.closest("[data-drop-id]") as HTMLElement | null;
+      const id = target?.getAttribute("data-drop-id") ?? null;
+      hoverIdRef.current = id;
+      setHoverId(id);
+    };
+    const onUp = () => {
+      const finalHoverId = hoverIdRef.current;
+      if (finalHoverId && finalHoverId !== dragging.id) handleDrop(dragging, finalHoverId);
+      setDragging(null);
+      setHoverId(null);
+      hoverIdRef.current = null;
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragging]);
+
   const submitRemark = async (taskId: string, text: string) => {
     if (!text.trim()) return;
     const tempId = `temp-${Date.now()}`;
@@ -303,6 +422,7 @@ export default function ProjectDetailPage() {
           addStage={addStage} deleteStage={deleteStage}
           addingTaskFor={addingTaskFor} setAddingTaskFor={setAddingTaskFor} addTask={addTask}
           taskView={taskView} setTaskView={setTaskView}
+          dragging={dragging} hoverId={hoverId} startDrag={startDrag}
         />
       )}
 
@@ -314,6 +434,7 @@ export default function ProjectDetailPage() {
           submitRemark={submitRemark} attachPhoto={attachPhoto}
           patchTask={patchTask} patchStage={patchStage}
           addStage={addStage} deleteStage={deleteStage}
+          dragging={dragging} hoverId={hoverId} startDrag={startDrag}
         />
       )}
 
@@ -424,21 +545,21 @@ function BackgroundTab(props: {
   addingTaskFor: { stageId: string; parentId: string | null } | null; setAddingTaskFor: (v: { stageId: string; parentId: string | null } | null) => void;
   addTask: (stageId: string, parentId: string | null, title: string) => void;
   taskView: "list" | "timeline"; setTaskView: (v: "list" | "timeline") => void;
-}) {
+} & DragCtl) {
   const { bg, bgForm, setBgForm, editing, setEditing, save, files, addFile } = props;
   return (
     <div>
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Why this project started</p>
-            {!editing && <button onClick={() => setEditing(true)} className="text-xs text-blue-600 hover:underline">Edit</button>}
-          </div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Why this project started</p>
           {editing ? (
-            <textarea value={bgForm.why ?? ""} onChange={e => setBgForm({ ...bgForm, why: e.target.value })} rows={4}
+            <textarea autoFocus value={bgForm.why ?? ""} onChange={e => setBgForm({ ...bgForm, why: e.target.value })} rows={4}
               className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5" />
           ) : (
-            <p className="text-sm text-gray-700 leading-relaxed">{bg?.why || "Not set yet."}</p>
+            <p onDoubleClick={() => setEditing(true)} title="Double-click to edit"
+              className="text-sm text-gray-700 leading-relaxed cursor-text hover:bg-yellow-50 rounded px-1 -mx-1">
+              {bg?.why || "Not set yet. Double-click to add."}
+            </p>
           )}
         </div>
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
@@ -458,7 +579,7 @@ function BackgroundTab(props: {
               </div>
             </div>
           ) : (
-            <div className="text-sm space-y-1">
+            <div onDoubleClick={() => setEditing(true)} title="Double-click to edit" className="text-sm space-y-1 cursor-text hover:bg-yellow-50 rounded px-1 -mx-1">
               <Row label="Client" value={bg?.client} />
               <Row label="PO no." value={bg?.poNumber} />
               <Row label="PO value" value={bg?.poValue ? fmtMoney(bg.poValue) : null} />
@@ -481,7 +602,7 @@ function BackgroundTab(props: {
       </div>
 
       <div className="border-t border-gray-100 pt-5">
-        <TaskTree {...props} targetEnd={bg?.targetEnd ?? null} />
+        <TaskTree {...props} />
       </div>
     </div>
   );
@@ -508,13 +629,13 @@ function TaskTree(props: {
   addingTaskFor: { stageId: string; parentId: string | null } | null; setAddingTaskFor: (v: { stageId: string; parentId: string | null } | null) => void;
   addTask: (stageId: string, parentId: string | null, title: string) => void;
   taskView: "list" | "timeline"; setTaskView: (v: "list" | "timeline") => void;
-  targetEnd: string | null;
-}) {
+} & DragCtl) {
   const {
     stages, tasks, comments, openTasks, toggleOpen, expandAllTasks, collapseAllTasks,
     openComments, toggleComments, submitRemark, attachPhoto,
     toggleMilestone, deleteTask, patchTask, patchStage, addStage, deleteStage,
-    addingTaskFor, setAddingTaskFor, addTask, taskView, setTaskView, targetEnd,
+    addingTaskFor, setAddingTaskFor, addTask, taskView, setTaskView,
+    dragging, hoverId, startDrag,
   } = props;
 
   return (
@@ -532,7 +653,7 @@ function TaskTree(props: {
       </div>
 
       {taskView === "timeline" ? (
-        <GanttView stages={stages} tasks={tasks} targetEnd={targetEnd} />
+        <GanttView stages={stages} tasks={tasks} />
       ) : (
       <div className="border border-gray-200 rounded-xl overflow-hidden">
         <div className="grid grid-cols-[1fr_70px_70px_70px_70px_60px] gap-1 bg-gray-50 border-b border-gray-200 px-2.5 py-1.5 text-[10px] font-medium text-gray-400 uppercase">
@@ -543,7 +664,9 @@ function TaskTree(props: {
           const mainTasks = tasks.filter(t => t.stageId === stage.id && !t.parentId);
           return (
             <div key={stage.id}>
-              <div className="grid grid-cols-[1fr_70px_70px_70px_70px_60px] gap-1 items-center px-2.5 py-2 bg-gray-50 border-b border-gray-200 cursor-pointer" onClick={() => toggleOpen(stage.id)}>
+              <div data-drop-id={stage.id} {...longPressHandlers(() => startDrag("stage", stage.id))}
+                className={`grid grid-cols-[1fr_70px_70px_70px_70px_60px] gap-1 items-center px-2.5 py-2 border-b border-gray-200 cursor-pointer select-none ${dragging?.id === stage.id ? "opacity-40" : "bg-gray-50"} ${hoverId === stage.id && dragging && dragging.id !== stage.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}
+                onClick={() => toggleOpen(stage.id)}>
                 <div className="flex items-center gap-1.5 min-w-0">
                   <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(stage.id) ? "rotate-90" : ""}`} />
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STAGE_DOT[stage.status]}`} />
@@ -564,7 +687,8 @@ function TaskTree(props: {
                   openTasks={openTasks} toggleOpen={toggleOpen} openComments={openComments} toggleComments={toggleComments}
                   submitRemark={submitRemark} attachPhoto={attachPhoto}
                   toggleMilestone={toggleMilestone} deleteTask={deleteTask} patchTask={patchTask}
-                  setAddingTaskFor={setAddingTaskFor} stageId={stage.id} />
+                  setAddingTaskFor={setAddingTaskFor} stageId={stage.id}
+                  dragging={dragging} hoverId={hoverId} startDrag={startDrag} />
               ))}
 
               {addingTaskFor?.stageId === stage.id && (
@@ -590,7 +714,7 @@ function TaskTree(props: {
 
 // ── Gantt / Timeline view ────────────────────────────────────────────────
 
-function GanttView({ stages, tasks, targetEnd }: { stages: Stage[]; tasks: PlanTask[]; targetEnd: string | null }) {
+function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
   const allDates: number[] = [];
   for (const s of stages) {
     if (s.planStart) allDates.push(new Date(s.planStart).getTime());
@@ -601,8 +725,6 @@ function GanttView({ stages, tasks, targetEnd }: { stages: Stage[]; tasks: PlanT
       if (d) allDates.push(new Date(d).getTime());
     }
   }
-  const deadlineMs = targetEnd ? new Date(targetEnd).getTime() : null;
-  if (deadlineMs !== null) allDates.push(deadlineMs);
   const today = Date.now();
 
   if (allDates.length === 0) {
@@ -612,7 +734,6 @@ function GanttView({ stages, tasks, targetEnd }: { stages: Stage[]; tasks: PlanT
   const rangeStart = Math.min(...allDates, today);
   const rangeEnd = Math.max(...allDates, today);
   const span = Math.max(rangeEnd - rangeStart, 86400000);
-  const deadlinePct = deadlineMs !== null ? ((deadlineMs - rangeStart) / span) * 100 : null;
 
   const pct = (d: string | null) => d ? ((new Date(d).getTime() - rangeStart) / span) * 100 : null;
   const todayPct = ((today - rangeStart) / span) * 100;
@@ -646,19 +767,13 @@ function GanttView({ stages, tasks, targetEnd }: { stages: Stage[]; tasks: PlanT
         <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: RISK_COLOR.risk }} /> Risk</span>
         <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rotate-45 inline-block" style={{ background: "#9333EA" }} /> Milestone</span>
         <span className="flex items-center gap-1"><span className="w-px h-3 inline-block bg-blue-500" /> Today</span>
-        {targetEnd && <span className="flex items-center gap-1"><Flag className="w-2.5 h-2.5 text-red-500" /> Deadline</span>}
       </div>
 
       <div className="relative">
-        {/* Today / deadline lines span the full height of the ruler + rows below, aligned to the bar-area column (offset past the w-36 label column). */}
+        {/* Today line spans the full height of the ruler + rows below, aligned to the bar-area column (offset past the w-36 label column). */}
         <div className="absolute left-36 right-0 top-0 bottom-0 pointer-events-none z-10">
           {todayPct >= 0 && todayPct <= 100 && (
             <div className="absolute top-0 bottom-0 w-px bg-blue-500" style={{ left: `${todayPct}%` }} />
-          )}
-          {deadlinePct !== null && deadlinePct >= 0 && deadlinePct <= 100 && (
-            <div className="absolute top-0 bottom-0 w-px bg-red-400" style={{ left: `${deadlinePct}%` }}>
-              <Flag className="w-3 h-3 text-red-500 absolute -top-4 -translate-x-1/2" style={{ left: "50%" }} />
-            </div>
           )}
         </div>
 
@@ -723,6 +838,7 @@ function GanttView({ stages, tasks, targetEnd }: { stages: Stage[]; tasks: PlanT
 function MainTaskRow({
   task, subTasks, comments, openTasks, toggleOpen, openComments, toggleComments,
   submitRemark, attachPhoto, toggleMilestone, deleteTask, patchTask, setAddingTaskFor, stageId,
+  dragging, hoverId, startDrag,
 }: {
   task: PlanTask; subTasks: PlanTask[]; comments: Comment[];
   openTasks: Set<string>; toggleOpen: (id: string) => void;
@@ -730,12 +846,13 @@ function MainTaskRow({
   submitRemark: (taskId: string, text: string) => void; attachPhoto: (id: string) => void;
   toggleMilestone: (t: PlanTask) => void; deleteTask: (id: string) => void; patchTask: (id: string, v: Partial<PlanTask>) => void;
   setAddingTaskFor: (v: { stageId: string; parentId: string | null } | null) => void; stageId: string;
-}) {
+} & DragCtl) {
   const hasChildren = subTasks.length > 0;
   const taskComments = comments.filter(c => c.taskId === task.id);
   return (
     <>
-      <div className="grid grid-cols-[1fr_70px_70px_70px_70px_60px] gap-1 items-center pl-5 pr-2.5 py-1.5 bg-white border-b border-gray-100 cursor-pointer hover:bg-gray-50"
+      <div data-drop-id={task.id} {...longPressHandlers(() => startDrag("task", task.id))}
+        className={`grid grid-cols-[1fr_70px_70px_70px_70px_60px] gap-1 items-center pl-5 pr-2.5 py-1.5 border-b border-gray-100 cursor-pointer select-none ${dragging?.id === task.id ? "opacity-40" : "bg-white hover:bg-gray-50"} ${hoverId === task.id && dragging && dragging.id !== task.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}
         onClick={() => hasChildren && toggleOpen(task.id)}>
         <div className="flex items-center gap-1.5 min-w-0">
           {hasChildren ? <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(task.id) ? "rotate-90" : ""}`} /> : <span className="w-3 text-center text-gray-300 text-xs">—</span>}
@@ -763,7 +880,8 @@ function MainTaskRow({
         <SubTaskRow key={st.id} task={st} comments={comments.filter(c => c.taskId === st.id)}
           openComments={openComments} toggleComments={toggleComments}
           submitRemark={submitRemark} attachPhoto={attachPhoto}
-          deleteTask={deleteTask} patchTask={patchTask} />
+          deleteTask={deleteTask} patchTask={patchTask}
+          dragging={dragging} hoverId={hoverId} startDrag={startDrag} />
       ))}
     </>
   );
@@ -771,14 +889,16 @@ function MainTaskRow({
 
 function SubTaskRow({
   task, comments, openComments, toggleComments, submitRemark, attachPhoto, deleteTask, patchTask,
+  dragging, hoverId, startDrag,
 }: {
   task: PlanTask; comments: Comment[]; openComments: Set<string>; toggleComments: (id: string) => void;
   submitRemark: (taskId: string, text: string) => void; attachPhoto: (id: string) => void;
   deleteTask: (id: string) => void; patchTask: (id: string, v: Partial<PlanTask>) => void;
-}) {
+} & DragCtl) {
   return (
     <>
-      <div className="grid grid-cols-[1fr_70px_70px_70px_70px_60px] gap-1 items-center pl-9 pr-2.5 py-1.5 bg-white border-b border-gray-100">
+      <div data-drop-id={task.id} {...longPressHandlers(() => startDrag("task", task.id))}
+        className={`grid grid-cols-[1fr_70px_70px_70px_70px_60px] gap-1 items-center pl-9 pr-2.5 py-1.5 border-b border-gray-100 select-none ${dragging?.id === task.id ? "opacity-40" : "bg-white"} ${hoverId === task.id && dragging && dragging.id !== task.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}>
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="w-1.5 h-[1.5px] bg-gray-300 flex-shrink-0" />
           <EditableName value={task.title} onSave={v => patchTask(task.id, { title: v })} className="text-xs text-gray-500 truncate" />
@@ -841,11 +961,11 @@ function StagesTab(props: {
   submitRemark: (taskId: string, text: string) => void; attachPhoto: (id: string) => void;
   patchTask: (id: string, v: Partial<PlanTask>) => void; patchStage: (id: string, v: Partial<Stage>) => void;
   addStage: (name: string) => void; deleteStage: (id: string) => void;
-}) {
+} & DragCtl) {
   const {
     stages, tasks, comments, openTasks, toggleOpen, expandAllTasks, collapseAllTasks,
     openComments, toggleComments, closeAllComments, submitRemark, attachPhoto, patchTask, patchStage,
-    addStage, deleteStage,
+    addStage, deleteStage, dragging, hoverId, startDrag,
   } = props;
 
   return (
@@ -865,7 +985,8 @@ function StagesTab(props: {
         const mainTasks = tasks.filter(t => t.stageId === stage.id && !t.parentId);
         return (
           <div key={stage.id} className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden mb-4">
-            <div className="flex items-center gap-2 px-3 py-2.5 bg-white border-b border-gray-200">
+            <div data-drop-id={stage.id} {...longPressHandlers(() => startDrag("stage", stage.id))}
+              className={`flex items-center gap-2 px-3 py-2.5 border-b border-gray-200 select-none ${dragging?.id === stage.id ? "opacity-40" : "bg-white"} ${hoverId === stage.id && dragging && dragging.id !== stage.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}>
               <span className={`w-2 h-2 rounded-full ${STAGE_DOT[stage.status]}`} />
               <EditableName value={stage.name} onSave={v => patchStage(stage.id, { name: v })} className="text-sm font-bold flex-1" />
               <select value={stage.status} onChange={e => patchStage(stage.id, { status: e.target.value as StageStatus })} className="text-xs border border-gray-200 rounded px-1.5 py-0.5">
@@ -880,7 +1001,8 @@ function StagesTab(props: {
             ) : mainTasks.map(mt => (
               <StageMainTask key={mt.id} task={mt} subTasks={tasks.filter(t => t.parentId === mt.id)} comments={comments}
                 openTasks={openTasks} toggleOpen={toggleOpen} openComments={openComments} toggleComments={toggleComments}
-                submitRemark={submitRemark} attachPhoto={attachPhoto} patchTask={patchTask} />
+                submitRemark={submitRemark} attachPhoto={attachPhoto} patchTask={patchTask}
+                dragging={dragging} hoverId={hoverId} startDrag={startDrag} />
             ))}
           </div>
         );
@@ -891,17 +1013,19 @@ function StagesTab(props: {
   );
 }
 
-function StageMainTask({ task, subTasks, comments, openTasks, toggleOpen, openComments, toggleComments, submitRemark, attachPhoto, patchTask }: {
+function StageMainTask({ task, subTasks, comments, openTasks, toggleOpen, openComments, toggleComments, submitRemark, attachPhoto, patchTask, dragging, hoverId, startDrag }: {
   task: PlanTask; subTasks: PlanTask[]; comments: Comment[];
   openTasks: Set<string>; toggleOpen: (id: string) => void; openComments: Set<string>; toggleComments: (id: string) => void;
   submitRemark: (taskId: string, text: string) => void; attachPhoto: (id: string) => void;
   patchTask: (id: string, v: Partial<PlanTask>) => void;
-}) {
+} & DragCtl) {
   const hasChildren = subTasks.length > 0;
   const taskComments = comments.filter(c => c.taskId === task.id);
   return (
     <>
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50 cursor-pointer" onClick={() => hasChildren && toggleOpen(task.id)}>
+      <div data-drop-id={task.id} {...longPressHandlers(() => startDrag("task", task.id))}
+        className={`flex items-center gap-2 px-3 py-2 border-b border-gray-200 cursor-pointer select-none ${dragging?.id === task.id ? "opacity-40" : "bg-gray-50"} ${hoverId === task.id && dragging && dragging.id !== task.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}
+        onClick={() => hasChildren && toggleOpen(task.id)}>
         {hasChildren ? <ChevronRight className={`w-3 h-3 transition-transform ${openTasks.has(task.id) ? "rotate-90" : ""}`} /> : <span className="w-3 text-center text-gray-300 text-xs">—</span>}
         <span className={`w-1.5 h-1.5 rotate-45 flex-shrink-0 ${task.isMilestone ? "bg-purple-600" : "bg-gray-400"}`} />
         <EditableName value={task.title} onSave={v => patchTask(task.id, { title: v })} className="text-xs flex-1" />
@@ -922,7 +1046,8 @@ function StageMainTask({ task, subTasks, comments, openTasks, toggleOpen, openCo
         const stComments = comments.filter(c => c.taskId === st.id);
         return (
           <div key={st.id}>
-            <div className="flex items-center gap-2 pl-8 pr-3 py-1.5 border-b border-gray-200 bg-gray-50">
+            <div data-drop-id={st.id} {...longPressHandlers(() => startDrag("task", st.id))}
+              className={`flex items-center gap-2 pl-8 pr-3 py-1.5 border-b border-gray-200 select-none ${dragging?.id === st.id ? "opacity-40" : "bg-gray-50"} ${hoverId === st.id && dragging && dragging.id !== st.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}>
               <span className="w-1.5 h-[1.5px] bg-gray-300 flex-shrink-0" />
               <EditableName value={st.title} onSave={v => patchTask(st.id, { title: v })} className="text-xs text-gray-500 flex-1" />
               <span className="text-[10px] text-gray-400 flex-shrink-0">{fmtDate(st.planStart)} – {fmtDate(st.planEnd)}</span>

@@ -13,6 +13,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ st
   for (const k of ["name", "status", "planStart", "planEnd", "actualStart", "actualEnd"]) {
     if (k in body) values[k] = body[k] || null;
   }
+  if ("sortOrder" in body) values.sortOrder = Number(body.sortOrder);
   if (Object.keys(values).length === 0) return NextResponse.json({ error: "No fields" }, { status: 400 });
   await db.update(projectStages).set(values).where(eq(projectStages.id, stageId));
   return NextResponse.json({ ok: true });
