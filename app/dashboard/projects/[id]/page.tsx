@@ -915,6 +915,20 @@ function GanttView({ stages, tasks, openTasks, toggleOpen }: { stages: Stage[]; 
   const totalDays = Math.round(span / 86400000);
   const showDailyRuler = totalDays <= 90; // beyond ~3 months, per-day ticks would be too dense to read
 
+  // Weekend bands and gridlines, only meaningful at daily granularity.
+  const weekendBands: { left: number; width: number }[] = [];
+  if (showDailyRuler) {
+    for (let i = 0; i <= totalDays; i++) {
+      const d = new Date(rangeStart + i * 86400000);
+      if (d.getUTCDay() === 6 || d.getUTCDay() === 0) {
+        weekendBands.push({ left: (i / totalDays) * 100, width: (1 / totalDays) * 100 });
+      }
+    }
+  }
+  const gridlinePcts = showDailyRuler
+    ? Array.from({ length: totalDays + 1 }, (_, i) => (i % 5 === 0 || i === totalDays) ? (i / totalDays) * 100 : null).filter((v): v is number => v !== null)
+    : tickDates.map((_, i) => (i / ticks) * 100);
+
   // RAG risk model, bumped to more saturated tones for presentation visibility.
   const WARNING_WINDOW_MS = 2 * 86400000;
   const taskRisk = (t: PlanTask): "risk" | "warning" | "ontrack" => {
@@ -941,9 +955,10 @@ function GanttView({ stages, tasks, openTasks, toggleOpen }: { stages: Stage[]; 
     const planL = pct(t.planStart), planR = pct(t.planEnd);
     const actL = pct(t.actualStart) ?? planL, actR = pct(t.actualEnd) ?? (t.status === "done" ? planR : (planL !== null ? Math.min(todayPct, 100) : null));
     const hasChildren = !t.parentId && tasks.some(x => x.parentId === t.id);
+    const tooltip = `${t.title}\nPlan: ${fmtDate(t.planStart)} – ${fmtDate(t.planEnd)}\nActual: ${fmtDate(t.actualStart)} – ${fmtDate(t.actualEnd)}`;
     return (
       <div key={t.id}>
-        <div className={`flex items-center gap-0 mb-1.5 ${t.parentId ? "pl-6" : ""} ${dim ? "opacity-50" : ""}`} style={{ height: 22 }}>
+        <div title={tooltip} className={`flex items-center gap-0 mb-1.5 rounded hover:bg-gray-50 ${t.parentId ? "pl-6" : ""} ${dim ? "opacity-50" : ""}`} style={{ height: 22 }}>
           <div className="w-40 flex-shrink-0 text-sm flex items-center gap-1 truncate pr-2 cursor-pointer" onClick={() => hasChildren && toggleOpen(t.id)}>
             {hasChildren && <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(t.id) ? "rotate-90" : ""}`} />}
             {t.isMilestone ? <span className="w-1.5 h-1.5 rotate-45 flex-shrink-0" style={{ background: "#9333EA" }} /> : <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-gray-300" />}
@@ -978,7 +993,7 @@ function GanttView({ stages, tasks, openTasks, toggleOpen }: { stages: Stage[]; 
     return (
       <div key={stage.id} className={`mb-3 rounded-lg ${opts.badge === "current" ? "border-2 p-2.5 -mx-2.5" : opts.badge === "next" ? "border p-2 -mx-2" : ""}`}
         style={opts.badge === "current" ? { borderColor: CURRENT_COLOR, background: "#EFF6FF" } : opts.badge === "next" ? { borderColor: "#C4B5FD", background: "#FAF5FF" } : undefined}>
-        <div className="flex items-center gap-1.5 mb-1.5 cursor-pointer" onClick={() => !opts.badge && toggleOpen(stage.id)}>
+        <div className="flex items-center gap-1.5 mb-1.5 cursor-pointer rounded hover:bg-gray-50" onClick={() => !opts.badge && toggleOpen(stage.id)}>
           {!opts.badge && <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`} />}
           <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${STAGE_DOT[stage.status]}`} />
           <span className="text-sm font-semibold">{stage.name}</span>
@@ -1013,6 +1028,12 @@ function GanttView({ stages, tasks, openTasks, toggleOpen }: { stages: Stage[]; 
 
       <div className="relative">
         <div className="absolute left-36 right-0 top-0 bottom-0 pointer-events-none z-10">
+          {weekendBands.map((b, i) => (
+            <div key={i} className="absolute top-0 bottom-0 bg-gray-100/60" style={{ left: `${b.left}%`, width: `${b.width}%` }} />
+          ))}
+          {gridlinePcts.map((p, i) => (
+            <div key={i} className="absolute top-0 bottom-0 w-px bg-gray-100" style={{ left: `${p}%` }} />
+          ))}
           {todayPct >= 0 && todayPct <= 100 && (
             <div className="absolute top-0 bottom-0 w-px bg-blue-500" style={{ left: `${todayPct}%` }} />
           )}
