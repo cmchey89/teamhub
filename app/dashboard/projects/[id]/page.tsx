@@ -616,16 +616,30 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
   const ticks = 5;
   const tickDates = Array.from({ length: ticks + 1 }, (_, i) => new Date(rangeStart + (span * i) / ticks));
 
-  const isOverdue = (t: PlanTask) => t.status !== "done" && t.planEnd && new Date(t.planEnd).getTime() < today;
-  const barColor = (t: PlanTask) => isOverdue(t) ? "#E24B4A" : t.status === "done" ? "#639922" : t.status === "in_progress" ? "#BA7517" : "#9CA3AF";
+  // RAG (red/amber/green) risk model:
+  //  - risk (red): planned end already passed and still not done
+  //  - warning (yellow): in progress with <2 days left, or should have started but hasn't
+  //  - on track (green): done, or in progress/pending with no risk signal
+  const WARNING_WINDOW_MS = 2 * 86400000;
+  const taskRisk = (t: PlanTask): "risk" | "warning" | "ontrack" => {
+    if (t.status === "done") return "ontrack";
+    const planEndMs = t.planEnd ? new Date(t.planEnd).getTime() : null;
+    const planStartMs = t.planStart ? new Date(t.planStart).getTime() : null;
+    if (planEndMs !== null && planEndMs < today) return "risk";
+    if (t.status === "pending" && planStartMs !== null && planStartMs < today) return "warning";
+    if (t.status === "in_progress" && planEndMs !== null && planEndMs - today <= WARNING_WINDOW_MS) return "warning";
+    return "ontrack";
+  };
+  const RISK_COLOR = { risk: "#E24B4A", warning: "#D9A404", ontrack: "#639922" } as const;
+  const barColor = (t: PlanTask) => RISK_COLOR[taskRisk(t)];
 
   return (
     <div className="border border-gray-200 rounded-xl p-4">
       <div className="flex gap-4 mb-3 text-[10px] text-gray-500">
         <span className="flex items-center gap-1"><span className="w-3 h-1 rounded bg-gray-300 inline-block" /> Planned</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: "#639922" }} /> Done</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: "#BA7517" }} /> In progress</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: "#E24B4A" }} /> Overdue</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: RISK_COLOR.ontrack }} /> On track</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: RISK_COLOR.warning }} /> Warning</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: RISK_COLOR.risk }} /> Risk</span>
         <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rotate-45 inline-block" style={{ background: "#9333EA" }} /> Milestone</span>
       </div>
 
@@ -673,8 +687,8 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
                         : <div className="absolute top-[6px] w-2 h-2 rounded-full -translate-x-1/2 border border-white" style={{ left: `${actR}%`, background: barColor(t) }} />
                     )}
                   </div>
-                  <div className="w-14 flex-shrink-0 text-[10px] text-right" style={{ color: isOverdue(t) ? "#E24B4A" : t.status === "done" ? "#3B6D11" : "#9CA3AF" }}>
-                    {isOverdue(t) ? "Overdue" : t.status === "done" ? `Done ${fmtDate(t.actualEnd)}` : t.status === "in_progress" ? "In progress" : "Pending"}
+                  <div className="w-14 flex-shrink-0 text-[10px] text-right" style={{ color: RISK_COLOR[taskRisk(t)] }}>
+                    {t.status === "done" ? `Done ${fmtDate(t.actualEnd)}` : taskRisk(t) === "risk" ? "Overdue" : taskRisk(t) === "warning" ? "Warning" : t.status === "in_progress" ? "In progress" : "Pending"}
                   </div>
                 </div>
               );
