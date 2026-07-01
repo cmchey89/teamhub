@@ -912,6 +912,8 @@ function GanttView({ stages, tasks, openTasks, toggleOpen }: { stages: Stage[]; 
 
   const ticks = 5;
   const tickDates = Array.from({ length: ticks + 1 }, (_, i) => new Date(rangeStart + (span * i) / ticks));
+  const totalDays = Math.round(span / 86400000);
+  const showDailyRuler = totalDays <= 90; // beyond ~3 months, per-day ticks would be too dense to read
 
   // RAG risk model, bumped to more saturated tones for presentation visibility.
   const WARNING_WINDOW_MS = 2 * 86400000;
@@ -1018,13 +1020,33 @@ function GanttView({ stages, tasks, openTasks, toggleOpen }: { stages: Stage[]; 
 
         <div className="flex mb-2">
           <div className="w-36 flex-shrink-0" />
-          <div className="flex-1 relative h-4 text-[11px] text-gray-400">
-            {tickDates.map((d, i) => (
-              <span key={i} className="absolute -translate-x-1/2" style={{ left: `${(i / ticks) * 100}%` }}>
-                {d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-              </span>
-            ))}
-          </div>
+          {showDailyRuler ? (
+            <div className="flex-1 relative h-7 text-[11px] text-gray-400">
+              {Array.from({ length: totalDays + 1 }, (_, i) => {
+                const d = new Date(rangeStart + i * 86400000);
+                const isMajor = i % 5 === 0 || i % 5 === 4 || i === totalDays;
+                const leftPct = (i / totalDays) * 100;
+                return (
+                  <div key={i} className="absolute top-0" style={{ left: `${leftPct}%` }}>
+                    <div className={isMajor ? "w-px h-2 bg-gray-400" : "w-px h-1 bg-gray-200"} />
+                    {isMajor && (
+                      <span className="absolute top-2.5 -translate-x-1/2 whitespace-nowrap text-gray-500 font-medium">
+                        {d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex-1 relative h-4 text-[11px] text-gray-400">
+              {tickDates.map((d, i) => (
+                <span key={i} className="absolute -translate-x-1/2" style={{ left: `${(i / ticks) * 100}%` }}>
+                  {d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {!focusMode && stages.map(stage => renderStage(stage, {}))}
