@@ -289,7 +289,7 @@ export default function ProjectDetailPage() {
   const toggleOpen = (taskId: string) => setOpenTasks(prev => { const s = new Set(prev); s.has(taskId) ? s.delete(taskId) : s.add(taskId); return s; });
   const toggleComments = (taskId: string) => setOpenComments(prev => { const s = new Set(prev); s.has(taskId) ? s.delete(taskId) : s.add(taskId); return s; });
   const closeAllComments = () => setOpenComments(new Set());
-  const expandAllTasks = () => setOpenTasks(new Set(tasks.filter(t => !t.parentId).map(t => t.id)));
+  const expandAllTasks = () => setOpenTasks(new Set([...stages.map(s => s.id), ...tasks.filter(t => !t.parentId).map(t => t.id)]));
   const collapseAllTasks = () => setOpenTasks(new Set());
 
   // ── Press-and-hold drag to reorder/move stages, main tasks, and sub tasks ──
@@ -814,8 +814,9 @@ function TaskTree(props: {
       {taskView === "timeline" ? (
         <GanttView stages={stages} tasks={tasks} />
       ) : (
+      <div className="overflow-x-auto">
       <div className="border border-gray-200 rounded-xl overflow-hidden">
-        <div className="grid grid-cols-[1fr_60px_60px_60px_60px_62px_82px] gap-1 bg-gray-50 border-b border-gray-200 px-2.5 py-1.5 text-[10px] font-medium text-gray-400 uppercase">
+        <div className="grid grid-cols-[minmax(160px,1fr)_98px_98px_98px_98px_78px_86px] min-w-[900px] gap-1 bg-gray-50 border-b border-gray-200 px-2.5 py-1.5 text-[10px] font-medium text-gray-400 uppercase">
           <span>Activity</span><span>Plan start</span><span>Plan end</span><span>Act. start</span><span>Act. end</span><span>Status</span><span></span>
         </div>
 
@@ -824,7 +825,7 @@ function TaskTree(props: {
           return (
             <div key={stage.id}>
               <div data-drop-id={stage.id} {...longPressHandlers(() => startDrag("stage", stage.id))}
-                className={`grid grid-cols-[1fr_60px_60px_60px_60px_62px_82px] gap-1 items-center px-2.5 py-2 border-b border-gray-200 cursor-pointer select-none ${dragging?.id === stage.id ? "opacity-40" : "bg-gray-50"} ${hoverId === stage.id && dragging && dragging.id !== stage.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}
+                className={`grid grid-cols-[minmax(160px,1fr)_98px_98px_98px_98px_78px_86px] min-w-[900px] gap-1 items-center px-2.5 py-2 border-b border-gray-200 cursor-pointer select-none ${dragging?.id === stage.id ? "opacity-40" : "bg-gray-50"} ${hoverId === stage.id && dragging && dragging.id !== stage.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}
                 onClick={() => toggleOpen(stage.id)}>
                 <div className="flex items-center gap-1.5 min-w-0">
                   <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(stage.id) ? "rotate-90" : ""}`} />
@@ -842,7 +843,7 @@ function TaskTree(props: {
                   <option value="done">Done</option>
                 </select>
                 <div className="flex gap-1 justify-end">
-                  <button onClick={e => { e.stopPropagation(); setAddingTaskFor({ stageId: stage.id, parentId: null }); }} className="w-5 h-5 border border-gray-200 rounded flex items-center justify-center hover:border-blue-300"><Plus className="w-3 h-3" /></button>
+                  <button onClick={e => { e.stopPropagation(); setAddingTaskFor({ stageId: stage.id, parentId: null }); if (!openTasks.has(stage.id)) toggleOpen(stage.id); }} className="w-5 h-5 border border-gray-200 rounded flex items-center justify-center hover:border-blue-300"><Plus className="w-3 h-3" /></button>
                   <button onClick={e => { e.stopPropagation(); deleteStage(stage.id); }} className="w-5 h-5 border border-gray-200 rounded flex items-center justify-center hover:border-red-300 text-gray-400 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
                 </div>
               </div>
@@ -853,14 +854,15 @@ function TaskTree(props: {
                   submitRemark={submitRemark} attachPhoto={attachPhoto}
                   toggleMilestone={toggleMilestone} deleteTask={deleteTask} patchTask={patchTask}
                   setAddingTaskFor={setAddingTaskFor} stageId={stage.id}
+                  addingTaskFor={addingTaskFor} addTask={addTask}
                   dragging={dragging} hoverId={hoverId} startDrag={startDrag} />
               ))}
 
-              {addingTaskFor?.stageId === stage.id && (
+              {openTasks.has(stage.id) && addingTaskFor?.stageId === stage.id && addingTaskFor.parentId === null && (
                 <AddTaskRow
-                  placeholder={addingTaskFor.parentId ? "Sub task title…" : "Main task title…"}
-                  indent={addingTaskFor.parentId ? 36 : 20}
-                  onAdd={title => addTask(stage.id, addingTaskFor.parentId, title)}
+                  placeholder="Main task title…"
+                  indent={20}
+                  onAdd={title => addTask(stage.id, null, title)}
                   onCancel={() => setAddingTaskFor(null)}
                 />
               )}
@@ -871,6 +873,7 @@ function TaskTree(props: {
         <div className="p-2.5 bg-gray-50">
           <AddStageRow addStage={addStage} />
         </div>
+      </div>
       </div>
       )}
     </div>
@@ -1003,7 +1006,7 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
 function MainTaskRow({
   task, subTasks, comments, openTasks, toggleOpen, openComments, toggleComments,
   submitRemark, attachPhoto, toggleMilestone, deleteTask, patchTask, setAddingTaskFor, stageId,
-  dragging, hoverId, startDrag,
+  addingTaskFor, addTask, dragging, hoverId, startDrag,
 }: {
   task: PlanTask; subTasks: PlanTask[]; comments: Comment[];
   openTasks: Set<string>; toggleOpen: (id: string) => void;
@@ -1011,13 +1014,15 @@ function MainTaskRow({
   submitRemark: (taskId: string, text: string) => void; attachPhoto: (id: string) => void;
   toggleMilestone: (t: PlanTask) => void; deleteTask: (id: string) => void; patchTask: (id: string, v: Partial<PlanTask>) => void;
   setAddingTaskFor: (v: { stageId: string; parentId: string | null } | null) => void; stageId: string;
+  addingTaskFor: { stageId: string; parentId: string | null } | null;
+  addTask: (stageId: string, parentId: string | null, title: string) => void;
 } & DragCtl) {
   const hasChildren = subTasks.length > 0;
   const taskComments = comments.filter(c => c.taskId === task.id);
   return (
     <>
       <div data-drop-id={task.id} {...longPressHandlers(() => startDrag("task", task.id))}
-        className={`grid grid-cols-[1fr_60px_60px_60px_60px_62px_82px] gap-1 items-center pl-5 pr-2.5 py-1.5 border-b border-gray-100 cursor-pointer select-none ${dragging?.id === task.id ? "opacity-40" : "bg-white hover:bg-gray-50"} ${hoverId === task.id && dragging && dragging.id !== task.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}
+        className={`grid grid-cols-[minmax(160px,1fr)_98px_98px_98px_98px_78px_86px] min-w-[900px] gap-1 items-center pl-5 pr-2.5 py-1.5 border-b border-gray-100 cursor-pointer select-none ${dragging?.id === task.id ? "opacity-40" : "bg-white hover:bg-gray-50"} ${hoverId === task.id && dragging && dragging.id !== task.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}
         onClick={() => hasChildren && toggleOpen(task.id)}>
         <div className="flex items-center gap-1.5 min-w-0">
           {hasChildren ? <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(task.id) ? "rotate-90" : ""}`} /> : <span className="w-3 text-center text-gray-300 text-xs">—</span>}
@@ -1038,7 +1043,7 @@ function MainTaskRow({
         <div className="flex gap-1 justify-end" onClick={e => e.stopPropagation()}>
           <button onClick={() => toggleComments(task.id)} className={`w-5 h-5 border rounded flex items-center justify-center ${openComments.has(task.id) || taskComments.length ? "border-blue-400 text-blue-600 bg-blue-50" : "border-gray-200 text-gray-400"}`}><MessageSquare className="w-3 h-3" /></button>
           <button onClick={() => toggleMilestone(task)} title="Toggle milestone" className={`w-5 h-5 border rounded flex items-center justify-center ${task.isMilestone ? "border-purple-300 text-purple-600 bg-purple-50" : "border-gray-200 text-gray-400"}`}><Flag className="w-3 h-3" /></button>
-          <button onClick={() => setAddingTaskFor({ stageId, parentId: task.id })} className="w-5 h-5 border border-gray-200 rounded flex items-center justify-center text-gray-400 hover:border-blue-300"><Plus className="w-3 h-3" /></button>
+          <button onClick={() => { setAddingTaskFor({ stageId, parentId: task.id }); if (!openTasks.has(task.id)) toggleOpen(task.id); }} className="w-5 h-5 border border-gray-200 rounded flex items-center justify-center text-gray-400 hover:border-blue-300"><Plus className="w-3 h-3" /></button>
           <button onClick={() => deleteTask(task.id)} className="w-5 h-5 border border-gray-200 rounded flex items-center justify-center text-gray-400 hover:border-red-300 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
         </div>
       </div>
@@ -1054,6 +1059,15 @@ function MainTaskRow({
           deleteTask={deleteTask} patchTask={patchTask}
           dragging={dragging} hoverId={hoverId} startDrag={startDrag} />
       ))}
+
+      {addingTaskFor?.parentId === task.id && (
+        <AddTaskRow
+          placeholder="Sub task title…"
+          indent={36}
+          onAdd={title => addTask(stageId, task.id, title)}
+          onCancel={() => setAddingTaskFor(null)}
+        />
+      )}
     </>
   );
 }
@@ -1069,7 +1083,7 @@ function SubTaskRow({
   return (
     <>
       <div data-drop-id={task.id} {...longPressHandlers(() => startDrag("task", task.id))}
-        className={`grid grid-cols-[1fr_60px_60px_60px_60px_62px_82px] gap-1 items-center pl-9 pr-2.5 py-1.5 border-b border-gray-100 select-none ${dragging?.id === task.id ? "opacity-40" : "bg-white"} ${hoverId === task.id && dragging && dragging.id !== task.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}>
+        className={`grid grid-cols-[minmax(160px,1fr)_98px_98px_98px_98px_78px_86px] min-w-[900px] gap-1 items-center pl-9 pr-2.5 py-1.5 border-b border-gray-100 select-none ${dragging?.id === task.id ? "opacity-40" : "bg-gray-50/70"} ${hoverId === task.id && dragging && dragging.id !== task.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}>
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="w-1.5 h-[1.5px] bg-gray-300 flex-shrink-0" />
           <EditableName value={task.title} onSave={v => patchTask(task.id, { title: v })} className="text-xs text-gray-500 truncate" />
