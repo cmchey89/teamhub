@@ -8,8 +8,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const [bg] = await db.select().from(projectBackground).where(eq(projectBackground.projectId, id));
-  const files = await db.select().from(projectFiles).where(eq(projectFiles.projectId, id));
+  const [[bg], files] = await Promise.all([
+    db.select().from(projectBackground).where(eq(projectBackground.projectId, id)),
+    db.select().from(projectFiles).where(eq(projectFiles.projectId, id)),
+  ]);
   return NextResponse.json({ background: bg ?? null, files });
 }
 
