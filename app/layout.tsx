@@ -5,7 +5,7 @@ import "./globals.css";
 const geist = Geist({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "TeamHub",
+  title: "MomentumFlow",
   description: "Team management system",
 };
 

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
 
-export const SESSION_COOKIE = 'teamhub_session';
+export const SESSION_COOKIE = 'momentumflow_session';
 
 export interface SessionUser {
   id: string;

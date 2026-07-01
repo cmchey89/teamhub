@@ -43,7 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="flex h-screen bg-gray-50">
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-6 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-blue-600">TeamHub</h1>
+          <h1 className="text-xl font-bold text-blue-600">MomentumFlow</h1>
           <p className="text-sm text-gray-500 mt-1 truncate">{me.name || me.email}</p>
           <div className="flex items-center gap-1 mt-1 flex-wrap">
             {me.role === "superadmin" && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Super Admin</span>}

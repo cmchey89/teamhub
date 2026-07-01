@@ -45,7 +45,7 @@ export default function ReportPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `teamhub-report-${from}-to-${to}.csv`;
+    a.download = `momentumflow-report-${from}-to-${to}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };

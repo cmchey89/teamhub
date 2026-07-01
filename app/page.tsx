@@ -40,9 +40,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-10 w-full max-w-sm">
         <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-6">
-          <span className="text-white font-bold text-lg">T</span>
+          <span className="text-white font-bold text-lg">M</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 text-center mb-1">TeamHub</h1>
+        <h1 className="text-2xl font-bold text-gray-900 text-center mb-1">MomentumFlow</h1>
         <p className="text-gray-500 text-sm text-center mb-8">
           Network · OSP · Finance · Management
         </p>
