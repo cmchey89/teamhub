@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "../../../../../lib/auth/session";
 import { db } from "../../../../../lib/db/client";
 import { projectStages, planTasks, taskComments } from "../../../../../lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, inArray } from "drizzle-orm";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = getSessionFromRequest(req);
@@ -12,18 +12,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const stages = await db.select().from(projectStages).where(eq(projectStages.projectId, id)).orderBy(asc(projectStages.sortOrder));
   const stageIds = stages.map(s => s.id);
 
-  let tasks: (typeof planTasks.$inferSelect)[] = [];
-  if (stageIds.length) {
-    tasks = await db.select().from(planTasks).orderBy(asc(planTasks.sortOrder));
-    tasks = tasks.filter(t => stageIds.includes(t.stageId));
-  }
+  const tasks = stageIds.length
+    ? await db.select().from(planTasks).where(inArray(planTasks.stageId, stageIds)).orderBy(asc(planTasks.sortOrder))
+    : [];
 
   const taskIds = tasks.map(t => t.id);
-  let comments: (typeof taskComments.$inferSelect)[] = [];
-  if (taskIds.length) {
-    comments = await db.select().from(taskComments).orderBy(asc(taskComments.createdAt));
-    comments = comments.filter(c => taskIds.includes(c.taskId));
-  }
+  const comments = taskIds.length
+    ? await db.select().from(taskComments).where(inArray(taskComments.taskId, taskIds)).orderBy(asc(taskComments.createdAt))
+    : [];
 
   return NextResponse.json({ stages, tasks, comments });
 }

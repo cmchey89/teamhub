@@ -262,7 +262,7 @@ export default function ProjectDetailPage() {
           openTasks={openTasks} toggleOpen={toggleOpen} expandAllTasks={expandAllTasks} collapseAllTasks={collapseAllTasks}
           openComments={openComments} toggleComments={toggleComments}
           submitRemark={submitRemark} attachPhoto={attachPhoto}
-          toggleMilestone={toggleMilestone} deleteTask={deleteTask} patchTask={patchTask}
+          toggleMilestone={toggleMilestone} deleteTask={deleteTask} patchTask={patchTask} patchStage={patchStage}
           addStage={addStage} deleteStage={deleteStage}
           addingTaskFor={addingTaskFor} setAddingTaskFor={setAddingTaskFor} addTask={addTask}
           taskView={taskView} setTaskView={setTaskView}
@@ -336,6 +336,43 @@ function AddTaskRow({ placeholder, indent, onAdd, onCancel }: {
   );
 }
 
+// Click a name to rename it in place. Local state keeps typing from re-rendering the tree.
+function EditableName({ value, onSave, className }: { value: string; onSave: (v: string) => void; className: string }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onFocus={e => e.target.select()}
+        onClick={e => e.stopPropagation()}
+        onBlur={() => {
+          setEditing(false);
+          const trimmed = draft.trim();
+          if (trimmed && trimmed !== value) onSave(trimmed); else setDraft(value);
+        }}
+        onKeyDown={e => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") { setDraft(value); setEditing(false); }
+        }}
+        className={`${className} border border-blue-300 rounded px-1 -mx-1 bg-white`}
+      />
+    );
+  }
+  return (
+    <span
+      onClick={e => { e.stopPropagation(); setDraft(value); setEditing(true); }}
+      title="Click to rename"
+      className={`${className} cursor-text hover:bg-yellow-50 rounded px-0.5 -mx-0.5`}
+    >
+      {value}
+    </span>
+  );
+}
+
 // ── Background Tab ─────────────────────────────────────────────────────
 
 function BackgroundTab(props: {
@@ -345,7 +382,7 @@ function BackgroundTab(props: {
   openTasks: Set<string>; toggleOpen: (id: string) => void; expandAllTasks: () => void; collapseAllTasks: () => void;
   openComments: Set<string>; toggleComments: (id: string) => void;
   submitRemark: (taskId: string, text: string) => void; attachPhoto: (id: string) => void;
-  toggleMilestone: (t: PlanTask) => void; deleteTask: (id: string) => void; patchTask: (id: string, v: Partial<PlanTask>) => void;
+  toggleMilestone: (t: PlanTask) => void; deleteTask: (id: string) => void; patchTask: (id: string, v: Partial<PlanTask>) => void; patchStage: (id: string, v: Partial<Stage>) => void;
   addStage: (name: string) => void; deleteStage: (id: string) => void;
   addingTaskFor: { stageId: string; parentId: string | null } | null; setAddingTaskFor: (v: { stageId: string; parentId: string | null } | null) => void;
   addTask: (stageId: string, parentId: string | null, title: string) => void;
@@ -429,7 +466,7 @@ function TaskTree(props: {
   openTasks: Set<string>; toggleOpen: (id: string) => void; expandAllTasks: () => void; collapseAllTasks: () => void;
   openComments: Set<string>; toggleComments: (id: string) => void;
   submitRemark: (taskId: string, text: string) => void; attachPhoto: (id: string) => void;
-  toggleMilestone: (t: PlanTask) => void; deleteTask: (id: string) => void; patchTask: (id: string, v: Partial<PlanTask>) => void;
+  toggleMilestone: (t: PlanTask) => void; deleteTask: (id: string) => void; patchTask: (id: string, v: Partial<PlanTask>) => void; patchStage: (id: string, v: Partial<Stage>) => void;
   addStage: (name: string) => void; deleteStage: (id: string) => void;
   addingTaskFor: { stageId: string; parentId: string | null } | null; setAddingTaskFor: (v: { stageId: string; parentId: string | null } | null) => void;
   addTask: (stageId: string, parentId: string | null, title: string) => void;
@@ -438,7 +475,7 @@ function TaskTree(props: {
   const {
     stages, tasks, comments, openTasks, toggleOpen, expandAllTasks, collapseAllTasks,
     openComments, toggleComments, submitRemark, attachPhoto,
-    toggleMilestone, deleteTask, patchTask, addStage, deleteStage,
+    toggleMilestone, deleteTask, patchTask, patchStage, addStage, deleteStage,
     addingTaskFor, setAddingTaskFor, addTask, taskView, setTaskView,
   } = props;
 
@@ -472,7 +509,7 @@ function TaskTree(props: {
                 <div className="flex items-center gap-1.5 min-w-0">
                   <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(stage.id) ? "rotate-90" : ""}`} />
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STAGE_DOT[stage.status]}`} />
-                  <b className="text-xs truncate">{stage.name}</b>
+                  <EditableName value={stage.name} onSave={v => patchStage(stage.id, { name: v })} className="text-xs font-bold truncate" />
                 </div>
                 <span className="text-xs text-gray-400">{fmtDate(stage.planStart)}</span>
                 <span className="text-xs text-gray-400">{fmtDate(stage.planEnd)}</span>
@@ -632,7 +669,7 @@ function MainTaskRow({
         <div className="flex items-center gap-1.5 min-w-0">
           {hasChildren ? <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(task.id) ? "rotate-90" : ""}`} /> : <span className="w-3 text-center text-gray-300 text-xs">—</span>}
           <span className={`w-1.5 h-1.5 rotate-45 flex-shrink-0 ${task.isMilestone ? "bg-purple-600" : "bg-gray-400"}`} />
-          <span className="text-xs truncate">{task.title}</span>
+          <EditableName value={task.title} onSave={v => patchTask(task.id, { title: v })} className="text-xs truncate" />
           {task.isMilestone && <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 flex-shrink-0"><Flag className="w-2 h-2" /> Milestone</span>}
         </div>
         <DateCell value={task.planStart} onChange={v => patchTask(task.id, { planStart: v })} />
@@ -673,7 +710,7 @@ function SubTaskRow({
       <div className="grid grid-cols-[1fr_70px_70px_70px_70px_60px] gap-1 items-center pl-9 pr-2.5 py-1.5 bg-white border-b border-gray-100">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="w-1.5 h-[1.5px] bg-gray-300 flex-shrink-0" />
-          <span className="text-xs text-gray-500 truncate">{task.title}</span>
+          <EditableName value={task.title} onSave={v => patchTask(task.id, { title: v })} className="text-xs text-gray-500 truncate" />
         </div>
         <DateCell value={task.planStart} onChange={v => patchTask(task.id, { planStart: v })} />
         <DateCell value={task.planEnd} onChange={v => patchTask(task.id, { planEnd: v })} />
@@ -759,7 +796,7 @@ function StagesTab(props: {
           <div key={stage.id} className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden mb-4">
             <div className="flex items-center gap-2 px-3 py-2.5 bg-white border-b border-gray-200">
               <span className={`w-2 h-2 rounded-full ${STAGE_DOT[stage.status]}`} />
-              <b className="text-sm flex-1">{stage.name}</b>
+              <EditableName value={stage.name} onSave={v => patchStage(stage.id, { name: v })} className="text-sm font-bold flex-1" />
               <select value={stage.status} onChange={e => patchStage(stage.id, { status: e.target.value as StageStatus })} className="text-xs border border-gray-200 rounded px-1.5 py-0.5">
                 <option value="pending">Pending</option>
                 <option value="in_progress">In progress</option>
@@ -796,7 +833,7 @@ function StageMainTask({ task, subTasks, comments, openTasks, toggleOpen, openCo
       <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50 cursor-pointer" onClick={() => hasChildren && toggleOpen(task.id)}>
         {hasChildren ? <ChevronRight className={`w-3 h-3 transition-transform ${openTasks.has(task.id) ? "rotate-90" : ""}`} /> : <span className="w-3 text-center text-gray-300 text-xs">—</span>}
         <span className={`w-1.5 h-1.5 rotate-45 flex-shrink-0 ${task.isMilestone ? "bg-purple-600" : "bg-gray-400"}`} />
-        <span className="text-xs flex-1">{task.title}</span>
+        <EditableName value={task.title} onSave={v => patchTask(task.id, { title: v })} className="text-xs flex-1" />
         {task.isMilestone && <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">Milestone</span>}
         <span className="text-[10px] text-gray-400 flex-shrink-0">{fmtDate(task.planStart)} – {fmtDate(task.planEnd)}</span>
         <select value={task.status} onChange={e => { e.stopPropagation(); patchTask(task.id, { status: e.target.value as StageStatus }); }} onClick={e => e.stopPropagation()}
@@ -816,7 +853,7 @@ function StageMainTask({ task, subTasks, comments, openTasks, toggleOpen, openCo
           <div key={st.id}>
             <div className="flex items-center gap-2 pl-8 pr-3 py-1.5 border-b border-gray-200 bg-gray-50">
               <span className="w-1.5 h-[1.5px] bg-gray-300 flex-shrink-0" />
-              <span className="text-xs text-gray-500 flex-1">{st.title}</span>
+              <EditableName value={st.title} onSave={v => patchTask(st.id, { title: v })} className="text-xs text-gray-500 flex-1" />
               <span className="text-[10px] text-gray-400 flex-shrink-0">{fmtDate(st.planStart)} – {fmtDate(st.planEnd)}</span>
               <button onClick={() => toggleComments(st.id)} className={`w-5 h-5 border rounded flex items-center justify-center flex-shrink-0 ${openComments.has(st.id) || stComments.length ? "border-blue-400 text-blue-600 bg-blue-50" : "border-gray-200 text-gray-400"}`}><MessageSquare className="w-3 h-3" /></button>
             </div>
