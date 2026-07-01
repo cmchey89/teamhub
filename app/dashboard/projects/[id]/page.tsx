@@ -69,10 +69,7 @@ export default function ProjectDetailPage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [openTasks, setOpenTasks] = useState<Set<string>>(new Set());
   const [openComments, setOpenComments] = useState<Set<string>>(new Set());
-  const [remarkDrafts, setRemarkDrafts] = useState<Record<string, string>>({});
-  const [newStageName, setNewStageName] = useState("");
   const [addingTaskFor, setAddingTaskFor] = useState<{ stageId: string; parentId: string | null } | null>(null);
-  const [newTaskTitle, setNewTaskTitle] = useState("");
   const [taskView, setTaskView] = useState<"list" | "timeline">("list");
 
   // finance
@@ -133,10 +130,10 @@ export default function ProjectDetailPage() {
   };
 
   // ── Stage/task handlers ──
-  const addStage = async () => {
-    if (!newStageName.trim()) return;
-    await fetch(`/api/projects/${id}/stages`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newStageName }) });
-    setNewStageName(""); loadStages();
+  const addStage = async (name: string) => {
+    if (!name.trim()) return;
+    await fetch(`/api/projects/${id}/stages`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+    loadStages();
   };
   const deleteStage = async (stageId: string) => {
     if (!confirm("Delete this stage and all its tasks?")) return;
@@ -146,13 +143,13 @@ export default function ProjectDetailPage() {
     await fetch(`/api/stages/${stageId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
     loadStages();
   };
-  const addTask = async () => {
-    if (!addingTaskFor || !newTaskTitle.trim()) return;
-    await fetch(`/api/stages/${addingTaskFor.stageId}/tasks`, {
+  const addTask = async (stageId: string, parentId: string | null, title: string) => {
+    if (!title.trim()) return;
+    await fetch(`/api/stages/${stageId}/tasks`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: newTaskTitle, parentId: addingTaskFor.parentId }),
+      body: JSON.stringify({ title, parentId }),
     });
-    setNewTaskTitle(""); setAddingTaskFor(null); loadStages();
+    setAddingTaskFor(null); loadStages();
   };
   const deleteTask = async (taskId: string) => {
     if (!confirm("Delete this task?")) return;
@@ -169,11 +166,9 @@ export default function ProjectDetailPage() {
   const expandAllTasks = () => setOpenTasks(new Set(tasks.filter(t => !t.parentId).map(t => t.id)));
   const collapseAllTasks = () => setOpenTasks(new Set());
 
-  const submitRemark = async (taskId: string) => {
-    const text = (remarkDrafts[taskId] || "").trim();
-    if (!text) return;
+  const submitRemark = async (taskId: string, text: string) => {
+    if (!text.trim()) return;
     await fetch(`/api/plan-tasks/${taskId}/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
-    setRemarkDrafts(prev => ({ ...prev, [taskId]: "" }));
     loadStages();
   };
   const attachPhoto = async (taskId: string) => {
@@ -266,10 +261,10 @@ export default function ProjectDetailPage() {
           stages={stages} tasks={tasks} comments={comments}
           openTasks={openTasks} toggleOpen={toggleOpen} expandAllTasks={expandAllTasks} collapseAllTasks={collapseAllTasks}
           openComments={openComments} toggleComments={toggleComments}
-          remarkDrafts={remarkDrafts} setRemarkDrafts={setRemarkDrafts} submitRemark={submitRemark} attachPhoto={attachPhoto}
+          submitRemark={submitRemark} attachPhoto={attachPhoto}
           toggleMilestone={toggleMilestone} deleteTask={deleteTask} patchTask={patchTask}
-          newStageName={newStageName} setNewStageName={setNewStageName} addStage={addStage} deleteStage={deleteStage}
-          addingTaskFor={addingTaskFor} setAddingTaskFor={setAddingTaskFor} newTaskTitle={newTaskTitle} setNewTaskTitle={setNewTaskTitle} addTask={addTask}
+          addStage={addStage} deleteStage={deleteStage}
+          addingTaskFor={addingTaskFor} setAddingTaskFor={setAddingTaskFor} addTask={addTask}
           taskView={taskView} setTaskView={setTaskView}
         />
       )}
@@ -279,9 +274,9 @@ export default function ProjectDetailPage() {
           stages={stages} tasks={tasks} comments={comments}
           openTasks={openTasks} toggleOpen={toggleOpen} expandAllTasks={expandAllTasks} collapseAllTasks={collapseAllTasks}
           openComments={openComments} toggleComments={toggleComments} closeAllComments={closeAllComments}
-          remarkDrafts={remarkDrafts} setRemarkDrafts={setRemarkDrafts} submitRemark={submitRemark} attachPhoto={attachPhoto}
+          submitRemark={submitRemark} attachPhoto={attachPhoto}
           patchTask={patchTask} patchStage={patchStage}
-          newStageName={newStageName} setNewStageName={setNewStageName} addStage={addStage} deleteStage={deleteStage}
+          addStage={addStage} deleteStage={deleteStage}
         />
       )}
 
@@ -312,6 +307,35 @@ export default function ProjectDetailPage() {
   );
 }
 
+// ── Small local-state inputs (kept isolated so typing doesn't re-render the whole tree) ──
+
+function AddStageRow({ addStage }: { addStage: (name: string) => void }) {
+  const [value, setValue] = useState("");
+  const submit = () => { if (value.trim()) { addStage(value); setValue(""); } };
+  return (
+    <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 flex gap-2">
+      <input value={value} onChange={e => setValue(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()}
+        placeholder="New stage name…" className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white" />
+      <button onClick={submit} className="text-sm text-blue-600 flex items-center gap-1 px-2 font-medium"><Plus className="w-4 h-4" /> Add stage</button>
+    </div>
+  );
+}
+
+function AddTaskRow({ placeholder, indent, onAdd, onCancel }: {
+  placeholder: string; indent: number; onAdd: (title: string) => void; onCancel: () => void;
+}) {
+  const [value, setValue] = useState("");
+  const submit = () => { if (value.trim()) onAdd(value); };
+  return (
+    <div className="px-2.5 py-2 bg-blue-50 border-b border-gray-200 flex gap-2" style={{ paddingLeft: indent }}>
+      <input autoFocus value={value} onChange={e => setValue(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()}
+        placeholder={placeholder} className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2" />
+      <button onClick={submit} className="text-sm bg-blue-600 text-white px-3 py-2 rounded-lg font-medium">Add</button>
+      <button onClick={onCancel} className="text-gray-400"><X className="w-4 h-4" /></button>
+    </div>
+  );
+}
+
 // ── Background Tab ─────────────────────────────────────────────────────
 
 function BackgroundTab(props: {
@@ -320,11 +344,11 @@ function BackgroundTab(props: {
   stages: Stage[]; tasks: PlanTask[]; comments: Comment[];
   openTasks: Set<string>; toggleOpen: (id: string) => void; expandAllTasks: () => void; collapseAllTasks: () => void;
   openComments: Set<string>; toggleComments: (id: string) => void;
-  remarkDrafts: Record<string, string>; setRemarkDrafts: (r: Record<string, string>) => void; submitRemark: (id: string) => void; attachPhoto: (id: string) => void;
+  submitRemark: (taskId: string, text: string) => void; attachPhoto: (id: string) => void;
   toggleMilestone: (t: PlanTask) => void; deleteTask: (id: string) => void; patchTask: (id: string, v: Partial<PlanTask>) => void;
-  newStageName: string; setNewStageName: (s: string) => void; addStage: () => void; deleteStage: (id: string) => void;
+  addStage: (name: string) => void; deleteStage: (id: string) => void;
   addingTaskFor: { stageId: string; parentId: string | null } | null; setAddingTaskFor: (v: { stageId: string; parentId: string | null } | null) => void;
-  newTaskTitle: string; setNewTaskTitle: (s: string) => void; addTask: () => void;
+  addTask: (stageId: string, parentId: string | null, title: string) => void;
   taskView: "list" | "timeline"; setTaskView: (v: "list" | "timeline") => void;
 }) {
   const { bg, bgForm, setBgForm, editing, setEditing, save, files, addFile } = props;
@@ -404,18 +428,18 @@ function TaskTree(props: {
   stages: Stage[]; tasks: PlanTask[]; comments: Comment[];
   openTasks: Set<string>; toggleOpen: (id: string) => void; expandAllTasks: () => void; collapseAllTasks: () => void;
   openComments: Set<string>; toggleComments: (id: string) => void;
-  remarkDrafts: Record<string, string>; setRemarkDrafts: (r: Record<string, string>) => void; submitRemark: (id: string) => void; attachPhoto: (id: string) => void;
+  submitRemark: (taskId: string, text: string) => void; attachPhoto: (id: string) => void;
   toggleMilestone: (t: PlanTask) => void; deleteTask: (id: string) => void; patchTask: (id: string, v: Partial<PlanTask>) => void;
-  newStageName: string; setNewStageName: (s: string) => void; addStage: () => void; deleteStage: (id: string) => void;
+  addStage: (name: string) => void; deleteStage: (id: string) => void;
   addingTaskFor: { stageId: string; parentId: string | null } | null; setAddingTaskFor: (v: { stageId: string; parentId: string | null } | null) => void;
-  newTaskTitle: string; setNewTaskTitle: (s: string) => void; addTask: () => void;
+  addTask: (stageId: string, parentId: string | null, title: string) => void;
   taskView: "list" | "timeline"; setTaskView: (v: "list" | "timeline") => void;
 }) {
   const {
     stages, tasks, comments, openTasks, toggleOpen, expandAllTasks, collapseAllTasks,
-    openComments, toggleComments, remarkDrafts, setRemarkDrafts, submitRemark, attachPhoto,
-    toggleMilestone, deleteTask, patchTask, newStageName, setNewStageName, addStage, deleteStage,
-    addingTaskFor, setAddingTaskFor, newTaskTitle, setNewTaskTitle, addTask, taskView, setTaskView,
+    openComments, toggleComments, submitRemark, attachPhoto,
+    toggleMilestone, deleteTask, patchTask, addStage, deleteStage,
+    addingTaskFor, setAddingTaskFor, addTask, taskView, setTaskView,
   } = props;
 
   return (
@@ -463,28 +487,25 @@ function TaskTree(props: {
               {openTasks.has(stage.id) && mainTasks.map(mt => (
                 <MainTaskRow key={mt.id} task={mt} subTasks={tasks.filter(t => t.parentId === mt.id)} comments={comments}
                   openTasks={openTasks} toggleOpen={toggleOpen} openComments={openComments} toggleComments={toggleComments}
-                  remarkDrafts={remarkDrafts} setRemarkDrafts={setRemarkDrafts} submitRemark={submitRemark} attachPhoto={attachPhoto}
+                  submitRemark={submitRemark} attachPhoto={attachPhoto}
                   toggleMilestone={toggleMilestone} deleteTask={deleteTask} patchTask={patchTask}
                   setAddingTaskFor={setAddingTaskFor} stageId={stage.id} />
               ))}
 
               {addingTaskFor?.stageId === stage.id && (
-                <div className="px-2.5 py-2 bg-blue-50 border-b border-gray-200 flex gap-2" style={{ paddingLeft: addingTaskFor.parentId ? 36 : 20 }}>
-                  <input autoFocus value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} onKeyDown={e => e.key === "Enter" && addTask()}
-                    placeholder={addingTaskFor.parentId ? "Sub task title…" : "Main task title…"}
-                    className="flex-1 text-xs border border-gray-300 rounded px-2 py-1" />
-                  <button onClick={addTask} className="text-xs bg-blue-600 text-white px-2.5 py-1 rounded">Add</button>
-                  <button onClick={() => setAddingTaskFor(null)} className="text-xs text-gray-400"><X className="w-3.5 h-3.5" /></button>
-                </div>
+                <AddTaskRow
+                  placeholder={addingTaskFor.parentId ? "Sub task title…" : "Main task title…"}
+                  indent={addingTaskFor.parentId ? 36 : 20}
+                  onAdd={title => addTask(stage.id, addingTaskFor.parentId, title)}
+                  onCancel={() => setAddingTaskFor(null)}
+                />
               )}
             </div>
           );
         })}
 
-        <div className="px-2.5 py-2 bg-gray-50 flex gap-2">
-          <input value={newStageName} onChange={e => setNewStageName(e.target.value)} onKeyDown={e => e.key === "Enter" && addStage()}
-            placeholder="New stage name…" className="flex-1 text-xs border border-gray-300 rounded px-2 py-1" />
-          <button onClick={addStage} className="text-xs text-blue-600 flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add stage</button>
+        <div className="p-2.5 bg-gray-50">
+          <AddStageRow addStage={addStage} />
         </div>
       </div>
       )}
@@ -593,12 +614,12 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
 
 function MainTaskRow({
   task, subTasks, comments, openTasks, toggleOpen, openComments, toggleComments,
-  remarkDrafts, setRemarkDrafts, submitRemark, attachPhoto, toggleMilestone, deleteTask, patchTask, setAddingTaskFor, stageId,
+  submitRemark, attachPhoto, toggleMilestone, deleteTask, patchTask, setAddingTaskFor, stageId,
 }: {
   task: PlanTask; subTasks: PlanTask[]; comments: Comment[];
   openTasks: Set<string>; toggleOpen: (id: string) => void;
   openComments: Set<string>; toggleComments: (id: string) => void;
-  remarkDrafts: Record<string, string>; setRemarkDrafts: (r: Record<string, string>) => void; submitRemark: (id: string) => void; attachPhoto: (id: string) => void;
+  submitRemark: (taskId: string, text: string) => void; attachPhoto: (id: string) => void;
   toggleMilestone: (t: PlanTask) => void; deleteTask: (id: string) => void; patchTask: (id: string, v: Partial<PlanTask>) => void;
   setAddingTaskFor: (v: { stageId: string; parentId: string | null } | null) => void; stageId: string;
 }) {
@@ -627,14 +648,13 @@ function MainTaskRow({
       </div>
 
       {openComments.has(task.id) && (
-        <CommentBox taskId={task.id} comments={taskComments} draft={remarkDrafts[task.id] || ""}
-          setDraft={v => setRemarkDrafts({ ...remarkDrafts, [task.id]: v })} submit={() => submitRemark(task.id)} attachPhoto={() => attachPhoto(task.id)} indent={20} />
+        <CommentBox taskId={task.id} comments={taskComments} submitRemark={submitRemark} attachPhoto={() => attachPhoto(task.id)} indent={20} />
       )}
 
       {openTasks.has(task.id) && subTasks.map(st => (
         <SubTaskRow key={st.id} task={st} comments={comments.filter(c => c.taskId === st.id)}
           openComments={openComments} toggleComments={toggleComments}
-          remarkDrafts={remarkDrafts} setRemarkDrafts={setRemarkDrafts} submitRemark={submitRemark} attachPhoto={attachPhoto}
+          submitRemark={submitRemark} attachPhoto={attachPhoto}
           deleteTask={deleteTask} patchTask={patchTask} />
       ))}
     </>
@@ -642,10 +662,10 @@ function MainTaskRow({
 }
 
 function SubTaskRow({
-  task, comments, openComments, toggleComments, remarkDrafts, setRemarkDrafts, submitRemark, attachPhoto, deleteTask, patchTask,
+  task, comments, openComments, toggleComments, submitRemark, attachPhoto, deleteTask, patchTask,
 }: {
   task: PlanTask; comments: Comment[]; openComments: Set<string>; toggleComments: (id: string) => void;
-  remarkDrafts: Record<string, string>; setRemarkDrafts: (r: Record<string, string>) => void; submitRemark: (id: string) => void; attachPhoto: (id: string) => void;
+  submitRemark: (taskId: string, text: string) => void; attachPhoto: (id: string) => void;
   deleteTask: (id: string) => void; patchTask: (id: string, v: Partial<PlanTask>) => void;
 }) {
   return (
@@ -665,8 +685,7 @@ function SubTaskRow({
         </div>
       </div>
       {openComments.has(task.id) && (
-        <CommentBox taskId={task.id} comments={comments} draft={remarkDrafts[task.id] || ""}
-          setDraft={v => setRemarkDrafts({ ...remarkDrafts, [task.id]: v })} submit={() => submitRemark(task.id)} attachPhoto={() => attachPhoto(task.id)} indent={36} />
+        <CommentBox taskId={task.id} comments={comments} submitRemark={submitRemark} attachPhoto={() => attachPhoto(task.id)} indent={36} />
       )}
     </>
   );
@@ -679,24 +698,26 @@ function DateCell({ value, onChange, accent }: { value: string | null; onChange:
   );
 }
 
-function CommentBox({ comments, draft, setDraft, submit, attachPhoto, indent }: {
-  taskId: string; comments: Comment[]; draft: string; setDraft: (v: string) => void; submit: () => void; attachPhoto: () => void; indent: number;
+function CommentBox({ taskId, comments, submitRemark, attachPhoto, indent }: {
+  taskId: string; comments: Comment[]; submitRemark: (taskId: string, text: string) => void; attachPhoto: () => void; indent: number;
 }) {
+  const [draft, setDraft] = useState("");
+  const submit = () => { if (draft.trim()) { submitRemark(taskId, draft); setDraft(""); } };
   return (
     <div className="bg-gray-50 border-b border-gray-100" style={{ paddingLeft: indent, paddingRight: 10 }}>
       <div className="border border-gray-200 rounded-lg overflow-hidden bg-white my-1.5">
         {comments.map(c => (
-          <div key={c.id} className="px-2.5 py-1.5 border-b border-gray-100 last:border-none">
-            <p className="text-[10px] text-gray-400">{c.authorName} · {new Date(c.createdAt).toLocaleDateString()}</p>
-            {c.text && <p className="text-xs text-gray-700 mt-0.5">{c.text}</p>}
-            {c.imageUrl && <a href={c.imageUrl} target="_blank" className="text-[10px] text-blue-600 flex items-center gap-1 mt-1"><FileText className="w-3 h-3" /> Photo attached</a>}
+          <div key={c.id} className="px-3 py-2 border-b border-gray-100 last:border-none">
+            <p className="text-xs text-gray-400">{c.authorName} · {new Date(c.createdAt).toLocaleDateString()}</p>
+            {c.text && <p className="text-sm text-gray-700 mt-0.5">{c.text}</p>}
+            {c.imageUrl && <a href={c.imageUrl} target="_blank" className="text-xs text-blue-600 flex items-center gap-1 mt-1"><FileText className="w-3.5 h-3.5" /> Photo attached</a>}
           </div>
         ))}
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50">
+        <div className="flex items-center gap-2 px-2.5 py-2 bg-gray-50">
           <input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()}
-            placeholder="Add remark…" className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 bg-white" />
-          <button onClick={submit} className="text-xs text-blue-600 px-1.5">Add</button>
-          <button onClick={attachPhoto} className="w-6 h-6 border border-gray-200 rounded flex items-center justify-center text-gray-400"><Upload className="w-3 h-3" /></button>
+            placeholder="Add remark…" className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white" />
+          <button onClick={submit} className="text-sm text-blue-600 px-2 font-medium">Add</button>
+          <button onClick={attachPhoto} className="w-8 h-8 border border-gray-200 rounded-lg flex items-center justify-center text-gray-400 flex-shrink-0"><Upload className="w-4 h-4" /></button>
         </div>
       </div>
     </div>
@@ -709,14 +730,14 @@ function StagesTab(props: {
   stages: Stage[]; tasks: PlanTask[]; comments: Comment[];
   openTasks: Set<string>; toggleOpen: (id: string) => void; expandAllTasks: () => void; collapseAllTasks: () => void;
   openComments: Set<string>; toggleComments: (id: string) => void; closeAllComments: () => void;
-  remarkDrafts: Record<string, string>; setRemarkDrafts: (r: Record<string, string>) => void; submitRemark: (id: string) => void; attachPhoto: (id: string) => void;
+  submitRemark: (taskId: string, text: string) => void; attachPhoto: (id: string) => void;
   patchTask: (id: string, v: Partial<PlanTask>) => void; patchStage: (id: string, v: Partial<Stage>) => void;
-  newStageName: string; setNewStageName: (s: string) => void; addStage: () => void; deleteStage: (id: string) => void;
+  addStage: (name: string) => void; deleteStage: (id: string) => void;
 }) {
   const {
     stages, tasks, comments, openTasks, toggleOpen, expandAllTasks, collapseAllTasks,
-    openComments, toggleComments, closeAllComments, remarkDrafts, setRemarkDrafts, submitRemark, attachPhoto, patchTask, patchStage,
-    newStageName, setNewStageName, addStage, deleteStage,
+    openComments, toggleComments, closeAllComments, submitRemark, attachPhoto, patchTask, patchStage,
+    addStage, deleteStage,
   } = props;
 
   return (
@@ -751,25 +772,21 @@ function StagesTab(props: {
             ) : mainTasks.map(mt => (
               <StageMainTask key={mt.id} task={mt} subTasks={tasks.filter(t => t.parentId === mt.id)} comments={comments}
                 openTasks={openTasks} toggleOpen={toggleOpen} openComments={openComments} toggleComments={toggleComments}
-                remarkDrafts={remarkDrafts} setRemarkDrafts={setRemarkDrafts} submitRemark={submitRemark} attachPhoto={attachPhoto} patchTask={patchTask} />
+                submitRemark={submitRemark} attachPhoto={attachPhoto} patchTask={patchTask} />
             ))}
           </div>
         );
       })}
 
-      <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 flex gap-2">
-        <input value={newStageName} onChange={e => setNewStageName(e.target.value)} onKeyDown={e => e.key === "Enter" && addStage()}
-          placeholder="New stage name…" className="flex-1 text-xs border border-gray-300 rounded px-2 py-1.5 bg-white" />
-        <button onClick={addStage} className="text-xs text-blue-600 flex items-center gap-1 px-2"><Plus className="w-3.5 h-3.5" /> Add stage</button>
-      </div>
+      <AddStageRow addStage={addStage} />
     </div>
   );
 }
 
-function StageMainTask({ task, subTasks, comments, openTasks, toggleOpen, openComments, toggleComments, remarkDrafts, setRemarkDrafts, submitRemark, attachPhoto, patchTask }: {
+function StageMainTask({ task, subTasks, comments, openTasks, toggleOpen, openComments, toggleComments, submitRemark, attachPhoto, patchTask }: {
   task: PlanTask; subTasks: PlanTask[]; comments: Comment[];
   openTasks: Set<string>; toggleOpen: (id: string) => void; openComments: Set<string>; toggleComments: (id: string) => void;
-  remarkDrafts: Record<string, string>; setRemarkDrafts: (r: Record<string, string>) => void; submitRemark: (id: string) => void; attachPhoto: (id: string) => void;
+  submitRemark: (taskId: string, text: string) => void; attachPhoto: (id: string) => void;
   patchTask: (id: string, v: Partial<PlanTask>) => void;
 }) {
   const hasChildren = subTasks.length > 0;
@@ -791,8 +808,7 @@ function StageMainTask({ task, subTasks, comments, openTasks, toggleOpen, openCo
         <button onClick={e => { e.stopPropagation(); toggleComments(task.id); }} className={`w-5 h-5 border rounded flex items-center justify-center flex-shrink-0 ${openComments.has(task.id) || taskComments.length ? "border-blue-400 text-blue-600 bg-blue-50" : "border-gray-200 text-gray-400"}`}><MessageSquare className="w-3 h-3" /></button>
       </div>
       {openComments.has(task.id) && (
-        <CommentBox taskId={task.id} comments={taskComments} draft={remarkDrafts[task.id] || ""}
-          setDraft={v => setRemarkDrafts({ ...remarkDrafts, [task.id]: v })} submit={() => submitRemark(task.id)} attachPhoto={() => attachPhoto(task.id)} indent={12} />
+        <CommentBox taskId={task.id} comments={taskComments} submitRemark={submitRemark} attachPhoto={() => attachPhoto(task.id)} indent={12} />
       )}
       {openTasks.has(task.id) && subTasks.map(st => {
         const stComments = comments.filter(c => c.taskId === st.id);
@@ -805,8 +821,7 @@ function StageMainTask({ task, subTasks, comments, openTasks, toggleOpen, openCo
               <button onClick={() => toggleComments(st.id)} className={`w-5 h-5 border rounded flex items-center justify-center flex-shrink-0 ${openComments.has(st.id) || stComments.length ? "border-blue-400 text-blue-600 bg-blue-50" : "border-gray-200 text-gray-400"}`}><MessageSquare className="w-3 h-3" /></button>
             </div>
             {openComments.has(st.id) && (
-              <CommentBox taskId={st.id} comments={stComments} draft={remarkDrafts[st.id] || ""}
-                setDraft={v => setRemarkDrafts({ ...remarkDrafts, [st.id]: v })} submit={() => submitRemark(st.id)} attachPhoto={() => attachPhoto(st.id)} indent={28} />
+              <CommentBox taskId={st.id} comments={stComments} submitRemark={submitRemark} attachPhoto={() => attachPhoto(st.id)} indent={28} />
             )}
           </div>
         );
