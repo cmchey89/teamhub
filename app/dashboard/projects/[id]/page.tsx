@@ -453,7 +453,7 @@ export default function ProjectDetailPage() {
   const contractorTotal = contractorClaims.reduce((s, c) => s + c.amount, 0);
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-8 max-w-7xl mx-auto">
       <Link href="/dashboard/projects" className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
         <ArrowLeft className="w-3.5 h-3.5" /> Back to Projects
       </Link>
@@ -464,10 +464,10 @@ export default function ProjectDetailPage() {
           {project?.description && <p className="text-gray-500 mt-1 text-sm">{project.description}</p>}
         </div>
         <div className="flex gap-2">
-          <button onClick={openImport} className="flex items-center gap-1.5 border border-gray-300 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50">
+          <button onClick={openImport} className="flex items-center gap-1.5 border border-gray-300 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50">
             <Upload className="w-3.5 h-3.5" /> Import template
           </button>
-          <button onClick={() => setShowExport(true)} className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-700">
+          <button onClick={() => setShowExport(true)} className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700">
             <Download className="w-3.5 h-3.5" /> Export as template
           </button>
         </div>
@@ -613,7 +613,7 @@ function BackgroundTab(props: {
     <div>
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Why this project started</p>
+          <p className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">Why this project started</p>
           {editing ? (
             <textarea autoFocus value={bgForm.why ?? ""} onChange={e => setBgForm({ ...bgForm, why: e.target.value })} rows={4}
               className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5" />
@@ -625,7 +625,7 @@ function BackgroundTab(props: {
           )}
         </div>
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Project details</p>
+          <p className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">Project details</p>
           {editing ? (
             <div className="space-y-2">
               <input value={bgForm.client ?? ""} onChange={e => setBgForm({ ...bgForm, client: e.target.value })} placeholder="Client" className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1" />
@@ -636,8 +636,8 @@ function BackgroundTab(props: {
                 <input type="date" value={bgForm.targetEnd ?? ""} onChange={e => setBgForm({ ...bgForm, targetEnd: e.target.value })} className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1" />
               </div>
               <div className="flex gap-2 pt-1">
-                <button onClick={save} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg">Save</button>
-                <button onClick={() => setEditing(false)} className="border border-gray-300 text-xs px-3 py-1.5 rounded-lg">Cancel</button>
+                <button onClick={save} className="bg-blue-600 text-white text-sm px-3 py-1.5 rounded-lg">Save</button>
+                <button onClick={() => setEditing(false)} className="border border-gray-300 text-sm px-3 py-1.5 rounded-lg">Cancel</button>
               </div>
             </div>
           ) : (
@@ -651,20 +651,20 @@ function BackgroundTab(props: {
         </div>
       </div>
 
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Diagrams &amp; project plans</p>
+      <p className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Diagrams &amp; project plans</p>
       <div className="flex gap-2 flex-wrap mb-6">
         {files.map(f => (
-          <a key={f.id} href={f.url} target="_blank" className="flex items-center gap-1.5 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white hover:border-blue-300">
+          <a key={f.id} href={f.url} target="_blank" className="flex items-center gap-1.5 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-white hover:border-blue-300">
             <FileText className="w-3.5 h-3.5 text-gray-400" /> {f.name}
           </a>
         ))}
-        <button onClick={addFile} className="flex items-center gap-1.5 border border-dashed border-gray-300 rounded-lg px-2.5 py-1.5 text-xs text-gray-500 hover:border-blue-300">
+        <button onClick={addFile} className="flex items-center gap-1.5 border border-dashed border-gray-300 rounded-lg px-2.5 py-1.5 text-sm text-gray-500 hover:border-blue-300">
           <Upload className="w-3.5 h-3.5" /> Upload…
         </button>
       </div>
 
       <div className="border-t border-gray-100 pt-5">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Task breakdown (read-only — edit in the Plan tab)</p>
+        <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Task breakdown (read-only — edit in the Plan tab)</p>
         <ReadOnlyTaskTree stages={stages} tasks={tasks} openTasks={openTasks} toggleOpen={toggleOpen} />
       </div>
     </div>
@@ -677,7 +677,7 @@ function ReadOnlyTaskTree({ stages, tasks, openTasks, toggleOpen }: {
   if (stages.length === 0) return <p className="text-sm text-gray-400 text-center py-10 border border-gray-200 rounded-xl">No stages yet — add them in the Plan tab.</p>;
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden">
-      <div className="grid grid-cols-[1fr_70px_70px_70px_70px] gap-1 bg-gray-50 border-b border-gray-200 px-2.5 py-1.5 text-[10px] font-medium text-gray-400 uppercase">
+      <div className="grid grid-cols-[1fr_70px_70px_70px_70px] gap-1 bg-gray-50 border-b border-gray-200 px-2.5 py-1.5 text-sm font-medium text-gray-400 uppercase">
         <span>Activity</span><span>Plan start</span><span>Plan end</span><span>Act. start</span><span>Act. end</span>
       </div>
       {stages.map(stage => {
@@ -688,12 +688,12 @@ function ReadOnlyTaskTree({ stages, tasks, openTasks, toggleOpen }: {
               <div className="flex items-center gap-1.5 min-w-0">
                 <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(stage.id) ? "rotate-90" : ""}`} />
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STAGE_DOT[stage.status]}`} />
-                <b className="text-xs truncate">{stage.name}</b>
+                <b className="text-sm truncate">{stage.name}</b>
               </div>
-              <span className="text-xs text-gray-400">{fmtDate(stage.planStart)}</span>
-              <span className="text-xs text-gray-400">{fmtDate(stage.planEnd)}</span>
-              <span className="text-xs text-blue-500">{fmtDate(stage.actualStart)}</span>
-              <span className="text-xs text-blue-500">{fmtDate(stage.actualEnd)}</span>
+              <span className="text-sm text-gray-400">{fmtDate(stage.planStart)}</span>
+              <span className="text-sm text-gray-400">{fmtDate(stage.planEnd)}</span>
+              <span className="text-sm text-blue-500">{fmtDate(stage.actualStart)}</span>
+              <span className="text-sm text-blue-500">{fmtDate(stage.actualEnd)}</span>
             </div>
             {openTasks.has(stage.id) && mainTasks.map(mt => (
               <ReadOnlyTaskRow key={mt.id} task={mt} subTasks={tasks.filter(t => t.parentId === mt.id)} openTasks={openTasks} toggleOpen={toggleOpen} />
@@ -713,26 +713,26 @@ function ReadOnlyTaskRow({ task, subTasks, openTasks, toggleOpen }: {
     <>
       <div className="grid grid-cols-[1fr_70px_70px_70px_70px] gap-1 items-center pl-5 pr-2.5 py-1.5 bg-white border-b border-gray-100 cursor-pointer hover:bg-gray-50" onClick={() => hasChildren && toggleOpen(task.id)}>
         <div className="flex items-center gap-1.5 min-w-0">
-          {hasChildren ? <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(task.id) ? "rotate-90" : ""}`} /> : <span className="w-3 text-center text-gray-300 text-xs">—</span>}
+          {hasChildren ? <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(task.id) ? "rotate-90" : ""}`} /> : <span className="w-3 text-center text-gray-300 text-sm">—</span>}
           <span className={`w-1.5 h-1.5 rotate-45 flex-shrink-0 ${task.isMilestone ? "bg-purple-600" : "bg-gray-400"}`} />
-          <span className="text-xs truncate">{task.title}</span>
-          {task.isMilestone && <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 flex-shrink-0"><Flag className="w-2 h-2" /></span>}
+          <span className="text-sm truncate">{task.title}</span>
+          {task.isMilestone && <span className="text-[11px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 flex-shrink-0"><Flag className="w-2 h-2" /></span>}
         </div>
-        <span className="text-xs text-gray-400">{fmtDate(task.planStart)}</span>
-        <span className="text-xs text-gray-400">{fmtDate(task.planEnd)}</span>
-        <span className="text-xs text-blue-500">{fmtDate(task.actualStart)}</span>
-        <span className="text-xs text-blue-500">{fmtDate(task.actualEnd)}</span>
+        <span className="text-sm text-gray-400">{fmtDate(task.planStart)}</span>
+        <span className="text-sm text-gray-400">{fmtDate(task.planEnd)}</span>
+        <span className="text-sm text-blue-500">{fmtDate(task.actualStart)}</span>
+        <span className="text-sm text-blue-500">{fmtDate(task.actualEnd)}</span>
       </div>
       {openTasks.has(task.id) && subTasks.map(st => (
         <div key={st.id} className="grid grid-cols-[1fr_70px_70px_70px_70px] gap-1 items-center pl-9 pr-2.5 py-1.5 bg-white border-b border-gray-100">
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="w-1.5 h-[1.5px] bg-gray-300 flex-shrink-0" />
-            <span className="text-xs text-gray-500 truncate">{st.title}</span>
+            <span className="text-sm text-gray-500 truncate">{st.title}</span>
           </div>
-          <span className="text-xs text-gray-400">{fmtDate(st.planStart)}</span>
-          <span className="text-xs text-gray-400">{fmtDate(st.planEnd)}</span>
-          <span className="text-xs text-blue-500">{fmtDate(st.actualStart)}</span>
-          <span className="text-xs text-blue-500">{fmtDate(st.actualEnd)}</span>
+          <span className="text-sm text-gray-400">{fmtDate(st.planStart)}</span>
+          <span className="text-sm text-gray-400">{fmtDate(st.planEnd)}</span>
+          <span className="text-sm text-blue-500">{fmtDate(st.actualStart)}</span>
+          <span className="text-sm text-blue-500">{fmtDate(st.actualEnd)}</span>
         </div>
       ))}
     </>
@@ -756,8 +756,8 @@ function PlanTab(props: {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs text-gray-400">Build the stage / main task / sub task structure, set planned dates, and log actual progress and remarks here. Background shows a read-only summary.</p>
-        <button onClick={() => props.setShowBulkImport(true)} className="flex items-center gap-1.5 border border-gray-300 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 flex-shrink-0 ml-3">
+        <p className="text-sm text-gray-400">Build the stage / main task / sub task structure, set planned dates, and log actual progress and remarks here. Background shows a read-only summary.</p>
+        <button onClick={() => props.setShowBulkImport(true)} className="flex items-center gap-1.5 border border-gray-300 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 flex-shrink-0 ml-3">
           <Upload className="w-3.5 h-3.5" /> Bulk import from text
         </button>
       </div>
@@ -768,7 +768,7 @@ function PlanTab(props: {
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   return (
-    <div className="flex justify-between border-b border-gray-100 py-1 text-xs">
+    <div className="flex justify-between border-b border-gray-100 py-1 text-sm">
       <span className="text-gray-400">{label}</span>
       <span className="text-gray-800 font-medium">{value || "—"}</span>
     </div>
@@ -799,15 +799,15 @@ function TaskTree(props: {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">Task breakdown</p>
+        <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">Task breakdown</p>
         <div className="flex items-center gap-3">
-          <div className="flex border border-gray-200 rounded-lg overflow-hidden text-xs">
+          <div className="flex border border-gray-200 rounded-lg overflow-hidden text-sm">
             <button onClick={() => setTaskView("list")} className={`px-2.5 py-1 ${taskView === "list" ? "bg-gray-100 font-medium text-gray-900" : "text-gray-400"}`}>List</button>
             <button onClick={() => setTaskView("timeline")} className={`px-2.5 py-1 border-l border-gray-200 ${taskView === "timeline" ? "bg-gray-100 font-medium text-gray-900" : "text-gray-400"}`}>Timeline</button>
           </div>
-          <button onClick={expandAllTasks} className="text-xs text-blue-600 hover:underline">Expand all</button>
-          <button onClick={collapseAllTasks} className="text-xs text-blue-600 hover:underline">Collapse all</button>
-          <button onClick={closeAllComments} className="text-xs text-blue-600 hover:underline">Close remarks</button>
+          <button onClick={expandAllTasks} className="text-sm text-blue-600 hover:underline">Expand all</button>
+          <button onClick={collapseAllTasks} className="text-sm text-blue-600 hover:underline">Collapse all</button>
+          <button onClick={closeAllComments} className="text-sm text-blue-600 hover:underline">Close remarks</button>
         </div>
       </div>
 
@@ -816,7 +816,7 @@ function TaskTree(props: {
       ) : (
       <div className="overflow-x-auto">
       <div className="border border-gray-200 rounded-xl overflow-hidden">
-        <div className="grid grid-cols-[minmax(160px,1fr)_98px_98px_98px_98px_78px_86px] min-w-[900px] gap-1 bg-gray-50 border-b border-gray-200 px-2.5 py-1.5 text-[10px] font-medium text-gray-400 uppercase">
+        <div className="grid grid-cols-[minmax(200px,1fr)_118px_118px_118px_118px_100px_100px] min-w-[1080px] gap-1 bg-gray-50 border-b border-gray-200 px-2.5 py-1.5 text-sm font-medium text-gray-400 uppercase">
           <span>Activity</span><span>Plan start</span><span>Plan end</span><span>Act. start</span><span>Act. end</span><span>Status</span><span></span>
         </div>
 
@@ -825,19 +825,19 @@ function TaskTree(props: {
           return (
             <div key={stage.id}>
               <div data-drop-id={stage.id} {...longPressHandlers(() => startDrag("stage", stage.id))}
-                className={`grid grid-cols-[minmax(160px,1fr)_98px_98px_98px_98px_78px_86px] min-w-[900px] gap-1 items-center px-2.5 py-2 border-b border-gray-200 cursor-pointer select-none ${dragging?.id === stage.id ? "opacity-40" : "bg-gray-50"} ${hoverId === stage.id && dragging && dragging.id !== stage.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}
+                className={`grid grid-cols-[minmax(200px,1fr)_118px_118px_118px_118px_100px_100px] min-w-[1080px] gap-1 items-center px-2.5 py-2 border-b border-gray-200 cursor-pointer select-none ${dragging?.id === stage.id ? "opacity-40" : "bg-gray-50"} ${hoverId === stage.id && dragging && dragging.id !== stage.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}
                 onClick={() => toggleOpen(stage.id)}>
                 <div className="flex items-center gap-1.5 min-w-0">
                   <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(stage.id) ? "rotate-90" : ""}`} />
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STAGE_DOT[stage.status]}`} />
-                  <EditableName value={stage.name} onSave={v => patchStage(stage.id, { name: v })} className="text-xs font-bold truncate" />
+                  <EditableName value={stage.name} onSave={v => patchStage(stage.id, { name: v })} className="text-sm font-bold truncate" />
                 </div>
-                <span className="text-xs text-gray-400">{fmtDate(stage.planStart)}</span>
-                <span className="text-xs text-gray-400">{fmtDate(stage.planEnd)}</span>
-                <span className="text-xs text-blue-500">{fmtDate(stage.actualStart)}</span>
-                <span className="text-xs text-blue-500">{fmtDate(stage.actualEnd)}</span>
+                <span className="text-sm text-gray-400">{fmtDate(stage.planStart)}</span>
+                <span className="text-sm text-gray-400">{fmtDate(stage.planEnd)}</span>
+                <span className="text-sm text-blue-500">{fmtDate(stage.actualStart)}</span>
+                <span className="text-sm text-blue-500">{fmtDate(stage.actualEnd)}</span>
                 <select value={stage.status} onChange={e => { e.stopPropagation(); patchStage(stage.id, { status: e.target.value as StageStatus }); }} onClick={e => e.stopPropagation()}
-                  className="text-[10px] border border-gray-200 rounded px-1 py-0.5">
+                  className="text-sm border border-gray-200 rounded px-1 py-0.5">
                   <option value="pending">Pending</option>
                   <option value="in_progress">In progress</option>
                   <option value="done">Done</option>
@@ -928,7 +928,7 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
 
   return (
     <div className="border border-gray-200 rounded-xl p-4">
-      <div className="flex gap-4 mb-3 text-[10px] text-gray-500">
+      <div className="flex gap-4 mb-3 text-sm text-gray-500">
         <span className="flex items-center gap-1"><span className="w-3 h-1 rounded bg-gray-300 inline-block" /> Planned</span>
         <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: RISK_COLOR.ontrack }} /> On track</span>
         <span className="flex items-center gap-1"><span className="w-3 h-1 rounded inline-block" style={{ background: RISK_COLOR.warning }} /> Warning</span>
@@ -947,7 +947,7 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
 
         <div className="flex mb-2">
           <div className="w-36 flex-shrink-0" />
-          <div className="flex-1 relative h-4 text-[9px] text-gray-400">
+          <div className="flex-1 relative h-4 text-[11px] text-gray-400">
             {tickDates.map((d, i) => (
               <span key={i} className="absolute -translate-x-1/2" style={{ left: `${(i / ticks) * 100}%` }}>
                 {d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
@@ -962,16 +962,16 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
           <div key={stage.id} className="mb-4">
             <div className="flex items-center gap-1.5 mb-1.5">
               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STAGE_DOT[stage.status]}`} />
-              <span className="text-xs font-medium">{stage.name}</span>
+              <span className="text-sm font-medium">{stage.name}</span>
             </div>
             {mainTasks.length === 0 ? (
-              <p className="text-[10px] text-gray-400 pl-4">No tasks yet.</p>
+              <p className="text-sm text-gray-400 pl-4">No tasks yet.</p>
             ) : mainTasks.map(t => {
               const planL = pct(t.planStart), planR = pct(t.planEnd);
               const actL = pct(t.actualStart) ?? planL, actR = pct(t.actualEnd) ?? (t.status === "done" ? planR : (planL !== null ? Math.min(todayPct, 100) : null));
               return (
                 <div key={t.id} className="flex items-center gap-0 mb-1.5" style={{ height: 20 }}>
-                  <div className="w-36 flex-shrink-0 text-[10px] flex items-center gap-1 truncate pr-2">
+                  <div className="w-36 flex-shrink-0 text-sm flex items-center gap-1 truncate pr-2">
                     {t.isMilestone ? <span className="w-1.5 h-1.5 rotate-45 flex-shrink-0" style={{ background: "#9333EA" }} /> : <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-gray-300" />}
                     <span className={`truncate ${t.isMilestone ? "text-purple-700" : "text-gray-600"}`}>{t.title}</span>
                   </div>
@@ -989,7 +989,7 @@ function GanttView({ stages, tasks }: { stages: Stage[]; tasks: PlanTask[] }) {
                         : <div className="absolute top-[6px] w-2 h-2 rounded-full -translate-x-1/2 border border-white" style={{ left: `${actR}%`, background: barColor(t) }} />
                     )}
                   </div>
-                  <div className="w-14 flex-shrink-0 text-[10px] text-right" style={{ color: RISK_COLOR[taskRisk(t)] }}>
+                  <div className="w-14 flex-shrink-0 text-sm text-right" style={{ color: RISK_COLOR[taskRisk(t)] }}>
                     {t.status === "done" ? `Done ${fmtDate(t.actualEnd)}` : taskRisk(t) === "risk" ? "Overdue" : taskRisk(t) === "warning" ? "Warning" : t.status === "in_progress" ? "In progress" : "Pending"}
                   </div>
                 </div>
@@ -1022,20 +1022,20 @@ function MainTaskRow({
   return (
     <>
       <div data-drop-id={task.id} {...longPressHandlers(() => startDrag("task", task.id))}
-        className={`grid grid-cols-[minmax(160px,1fr)_98px_98px_98px_98px_78px_86px] min-w-[900px] gap-1 items-center pl-5 pr-2.5 py-1.5 border-b border-gray-100 cursor-pointer select-none ${dragging?.id === task.id ? "opacity-40" : "bg-white hover:bg-gray-50"} ${hoverId === task.id && dragging && dragging.id !== task.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}
+        className={`grid grid-cols-[minmax(200px,1fr)_118px_118px_118px_118px_100px_100px] min-w-[1080px] gap-1 items-center pl-5 pr-2.5 py-1.5 border-b border-gray-100 cursor-pointer select-none ${dragging?.id === task.id ? "opacity-40" : "bg-white hover:bg-gray-50"} ${hoverId === task.id && dragging && dragging.id !== task.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}
         onClick={() => hasChildren && toggleOpen(task.id)}>
         <div className="flex items-center gap-1.5 min-w-0">
-          {hasChildren ? <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(task.id) ? "rotate-90" : ""}`} /> : <span className="w-3 text-center text-gray-300 text-xs">—</span>}
+          {hasChildren ? <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(task.id) ? "rotate-90" : ""}`} /> : <span className="w-3 text-center text-gray-300 text-sm">—</span>}
           <span className={`w-1.5 h-1.5 rotate-45 flex-shrink-0 ${task.isMilestone ? "bg-purple-600" : "bg-gray-400"}`} />
-          <EditableName value={task.title} onSave={v => patchTask(task.id, { title: v })} className="text-xs truncate" />
-          {task.isMilestone && <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 flex-shrink-0"><Flag className="w-2 h-2" /> Milestone</span>}
+          <EditableName value={task.title} onSave={v => patchTask(task.id, { title: v })} className="text-sm truncate" />
+          {task.isMilestone && <span className="text-[11px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 flex-shrink-0"><Flag className="w-2 h-2" /> Milestone</span>}
         </div>
         <DateCell value={task.planStart} onChange={v => patchTask(task.id, { planStart: v })} />
         <DateCell value={task.planEnd} onChange={v => patchTask(task.id, { planEnd: v })} />
         <DateCell value={task.actualStart} onChange={v => patchTask(task.id, { actualStart: v })} accent />
         <DateCell value={task.actualEnd} onChange={v => patchTask(task.id, { actualEnd: v })} accent />
         <select value={task.status} onChange={e => { e.stopPropagation(); patchTask(task.id, { status: e.target.value as StageStatus }); }} onClick={e => e.stopPropagation()}
-          className="text-[10px] border border-gray-200 rounded px-1 py-0.5">
+          className="text-sm border border-gray-200 rounded px-1 py-0.5">
           <option value="pending">Pending</option>
           <option value="in_progress">In progress</option>
           <option value="done">Done</option>
@@ -1083,17 +1083,17 @@ function SubTaskRow({
   return (
     <>
       <div data-drop-id={task.id} {...longPressHandlers(() => startDrag("task", task.id))}
-        className={`grid grid-cols-[minmax(160px,1fr)_98px_98px_98px_98px_78px_86px] min-w-[900px] gap-1 items-center pl-9 pr-2.5 py-1.5 border-b border-gray-100 select-none ${dragging?.id === task.id ? "opacity-40" : "bg-gray-50/70"} ${hoverId === task.id && dragging && dragging.id !== task.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}>
+        className={`grid grid-cols-[minmax(200px,1fr)_118px_118px_118px_118px_100px_100px] min-w-[1080px] gap-1 items-center pl-9 pr-2.5 py-1.5 border-b border-gray-100 select-none ${dragging?.id === task.id ? "opacity-40" : "bg-gray-50/70"} ${hoverId === task.id && dragging && dragging.id !== task.id ? "ring-2 ring-blue-400 ring-inset" : ""}`}>
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="w-1.5 h-[1.5px] bg-gray-300 flex-shrink-0" />
-          <EditableName value={task.title} onSave={v => patchTask(task.id, { title: v })} className="text-xs text-gray-500 truncate" />
+          <EditableName value={task.title} onSave={v => patchTask(task.id, { title: v })} className="text-sm text-gray-500 truncate" />
         </div>
         <DateCell value={task.planStart} onChange={v => patchTask(task.id, { planStart: v })} />
         <DateCell value={task.planEnd} onChange={v => patchTask(task.id, { planEnd: v })} />
         <DateCell value={task.actualStart} onChange={v => patchTask(task.id, { actualStart: v })} accent />
         <DateCell value={task.actualEnd} onChange={v => patchTask(task.id, { actualEnd: v })} accent />
         <select value={task.status} onChange={e => patchTask(task.id, { status: e.target.value as StageStatus })}
-          className="text-[10px] border border-gray-200 rounded px-1 py-0.5">
+          className="text-sm border border-gray-200 rounded px-1 py-0.5">
           <option value="pending">Pending</option>
           <option value="in_progress">In progress</option>
           <option value="done">Done</option>
@@ -1113,7 +1113,7 @@ function SubTaskRow({
 function DateCell({ value, onChange, accent }: { value: string | null; onChange: (v: string) => void; accent?: boolean }) {
   return (
     <input type="date" value={value ?? ""} onChange={e => onChange(e.target.value)}
-      className={`text-[10px] bg-transparent border-none focus:ring-1 focus:ring-blue-300 rounded px-0.5 ${accent ? "text-blue-600" : "text-gray-500"}`} />
+      className={`text-sm bg-transparent border-none focus:ring-1 focus:ring-blue-300 rounded px-0.5 ${accent ? "text-blue-600" : "text-gray-500"}`} />
   );
 }
 
@@ -1127,9 +1127,9 @@ function CommentBox({ taskId, comments, submitRemark, attachPhoto, indent }: {
       <div className="border border-gray-200 rounded-lg overflow-hidden bg-white my-1.5">
         {comments.map(c => (
           <div key={c.id} className="px-3 py-2 border-b border-gray-100 last:border-none">
-            <p className="text-xs text-gray-400">{c.authorName} · {new Date(c.createdAt).toLocaleDateString()}</p>
+            <p className="text-sm text-gray-400">{c.authorName} · {new Date(c.createdAt).toLocaleDateString()}</p>
             {c.text && <p className="text-sm text-gray-700 mt-0.5">{c.text}</p>}
-            {c.imageUrl && <a href={c.imageUrl} target="_blank" className="text-xs text-blue-600 flex items-center gap-1 mt-1"><FileText className="w-3.5 h-3.5" /> Photo attached</a>}
+            {c.imageUrl && <a href={c.imageUrl} target="_blank" className="text-sm text-blue-600 flex items-center gap-1 mt-1"><FileText className="w-3.5 h-3.5" /> Photo attached</a>}
           </div>
         ))}
         <div className="flex items-center gap-2 px-2.5 py-2 bg-gray-50">
@@ -1172,27 +1172,27 @@ function FinanceTab({
     <div>
       <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="bg-gray-50 rounded-xl p-3">
-          <p className="text-[10px] text-gray-400 mb-1">PO value</p>
+          <p className="text-sm text-gray-400 mb-1">PO value</p>
           <p className="text-lg font-semibold">{fmtMoney(poValue)}</p>
-          <p className="text-[10px] text-gray-400">{poNumber || "—"}</p>
+          <p className="text-sm text-gray-400">{poNumber || "—"}</p>
         </div>
         <div className="bg-gray-50 rounded-xl p-3">
-          <p className="text-[10px] text-gray-400 mb-1">Claimed to client</p>
+          <p className="text-sm text-gray-400 mb-1">Claimed to client</p>
           <p className="text-lg font-semibold text-blue-600">{fmtMoney(clientTotal)}</p>
-          <p className="text-[10px] text-gray-400">{fmtMoney(Math.max(poValue - clientTotal, 0))} remaining</p>
+          <p className="text-sm text-gray-400">{fmtMoney(Math.max(poValue - clientTotal, 0))} remaining</p>
         </div>
         <div className="bg-gray-50 rounded-xl p-3">
-          <p className="text-[10px] text-gray-400 mb-1">Contractor costs</p>
+          <p className="text-sm text-gray-400 mb-1">Contractor costs</p>
           <p className="text-lg font-semibold text-amber-600">{fmtMoney(contractorTotal)}</p>
         </div>
       </div>
 
       <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Your claims to client</p>
-        <button onClick={() => setShowClaimForm("client")} className="text-xs text-blue-600 flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add claim</button>
+        <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Your claims to client</p>
+        <button onClick={() => setShowClaimForm("client")} className="text-sm text-blue-600 flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add claim</button>
       </div>
-      <table className="w-full text-xs border border-gray-200 rounded-lg overflow-hidden mb-6">
-        <thead><tr className="bg-gray-50 text-gray-400 text-[10px] uppercase"><th className="text-left px-3 py-1.5">Stage</th><th className="text-left px-3 py-1.5">Amount</th><th className="text-left px-3 py-1.5">Invoice</th><th className="text-left px-3 py-1.5">Status</th></tr></thead>
+      <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden mb-6">
+        <thead><tr className="bg-gray-50 text-gray-400 text-sm uppercase"><th className="text-left px-3 py-1.5">Stage</th><th className="text-left px-3 py-1.5">Amount</th><th className="text-left px-3 py-1.5">Invoice</th><th className="text-left px-3 py-1.5">Status</th></tr></thead>
         <tbody>
           {clientClaims.map(c => (
             <tr key={c.id} className="border-t border-gray-100">
@@ -1200,7 +1200,7 @@ function FinanceTab({
               <td className="px-3 py-1.5">{fmtMoney(c.amount)}</td>
               <td className="px-3 py-1.5">{c.invoiceNo || "—"}</td>
               <td className="px-3 py-1.5">
-                <select value={c.status} onChange={e => setClaimStatus("client", c.id, e.target.value as ClaimStatus)} className={`text-[10px] rounded-full px-2 py-0.5 border-none ${CLAIM_COLORS[c.status]}`}>
+                <select value={c.status} onChange={e => setClaimStatus("client", c.id, e.target.value as ClaimStatus)} className={`text-sm rounded-full px-2 py-0.5 border-none ${CLAIM_COLORS[c.status]}`}>
                   {(["pending", "submitted", "approved", "paid"] as ClaimStatus[]).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </td>
@@ -1211,14 +1211,14 @@ function FinanceTab({
       </table>
 
       <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Contractor claims</p>
+        <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Contractor claims</p>
         <div className="flex gap-3">
-          <button onClick={() => setShowContractorForm(true)} className="text-xs text-blue-600 flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add contractor</button>
-          <button onClick={() => setShowClaimForm("contractor")} className="text-xs text-blue-600 flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add claim</button>
+          <button onClick={() => setShowContractorForm(true)} className="text-sm text-blue-600 flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add contractor</button>
+          <button onClick={() => setShowClaimForm("contractor")} className="text-sm text-blue-600 flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add claim</button>
         </div>
       </div>
-      <table className="w-full text-xs border border-gray-200 rounded-lg overflow-hidden">
-        <thead><tr className="bg-gray-50 text-gray-400 text-[10px] uppercase"><th className="text-left px-3 py-1.5">Contractor</th><th className="text-left px-3 py-1.5">Scope</th><th className="text-left px-3 py-1.5">Stage</th><th className="text-left px-3 py-1.5">Amount</th><th className="text-left px-3 py-1.5">Invoice</th><th className="text-left px-3 py-1.5">Status</th></tr></thead>
+      <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+        <thead><tr className="bg-gray-50 text-gray-400 text-sm uppercase"><th className="text-left px-3 py-1.5">Contractor</th><th className="text-left px-3 py-1.5">Scope</th><th className="text-left px-3 py-1.5">Stage</th><th className="text-left px-3 py-1.5">Amount</th><th className="text-left px-3 py-1.5">Invoice</th><th className="text-left px-3 py-1.5">Status</th></tr></thead>
         <tbody>
           {contractorClaims.map(c => (
             <tr key={c.id} className="border-t border-gray-100">
@@ -1228,7 +1228,7 @@ function FinanceTab({
               <td className="px-3 py-1.5">{fmtMoney(c.amount)}</td>
               <td className="px-3 py-1.5">{c.invoiceNo || "—"}</td>
               <td className="px-3 py-1.5">
-                <select value={c.status} onChange={e => setClaimStatus("contractor", c.id, e.target.value as ClaimStatus)} className={`text-[10px] rounded-full px-2 py-0.5 border-none ${CLAIM_COLORS[c.status]}`}>
+                <select value={c.status} onChange={e => setClaimStatus("contractor", c.id, e.target.value as ClaimStatus)} className={`text-sm rounded-full px-2 py-0.5 border-none ${CLAIM_COLORS[c.status]}`}>
                   {(["pending", "submitted", "approved", "paid"] as ClaimStatus[]).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </td>
@@ -1242,7 +1242,7 @@ function FinanceTab({
         <Modal title="Add contractor" onClose={() => setShowContractorForm(false)}>
           <input value={conName} onChange={e => setConName(e.target.value)} placeholder="Contractor name" className="w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 mb-2" />
           <input value={conScope} onChange={e => setConScope(e.target.value)} placeholder="Scope (e.g. Cabling)" className="w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 mb-3" />
-          <button onClick={() => { addContractor(conName, conScope); setConName(""); setConScope(""); }} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg">Add</button>
+          <button onClick={() => { addContractor(conName, conScope); setConName(""); setConScope(""); }} className="bg-blue-600 text-white text-sm px-3 py-1.5 rounded-lg">Add</button>
         </Modal>
       )}
 
@@ -1260,7 +1260,7 @@ function FinanceTab({
           </select>
           <input type="number" value={claimAmount} onChange={e => setClaimAmount(e.target.value)} placeholder="Amount ($)" className="w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 mb-2" />
           <input value={claimInvoice} onChange={e => setClaimInvoice(e.target.value)} placeholder="Invoice no. (optional)" className="w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 mb-3" />
-          <button onClick={submitClaim} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg">Add claim</button>
+          <button onClick={submitClaim} className="bg-blue-600 text-white text-sm px-3 py-1.5 rounded-lg">Add claim</button>
         </Modal>
       )}
     </div>
@@ -1289,13 +1289,13 @@ function ExportModal({ onClose, onExport }: { onClose: () => void; onExport: (na
   return (
     <Modal title="Export as template" onClose={onClose}>
       <input value={name} onChange={e => setName(e.target.value)} placeholder="Template name" className="w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 mb-3" />
-      <label className="flex items-start gap-2 text-xs text-gray-600 mb-4 cursor-pointer">
+      <label className="flex items-start gap-2 text-sm text-gray-600 mb-4 cursor-pointer">
         <input type="checkbox" checked={includeDurations} onChange={e => setIncludeDurations(e.target.checked)} className="mt-0.5" />
         Include planned durations (days per task) — gives the next project a head-start estimate. Leave unchecked for structure-only SOP.
       </label>
       <div className="flex gap-2">
-        <button onClick={() => onExport(name, includeDurations, true)} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg flex items-center gap-1"><Download className="w-3.5 h-3.5" /> Save to library &amp; download</button>
-        <button onClick={() => onExport(name, includeDurations, false)} className="border border-gray-300 text-xs px-3 py-1.5 rounded-lg">Download only</button>
+        <button onClick={() => onExport(name, includeDurations, true)} className="bg-blue-600 text-white text-sm px-3 py-1.5 rounded-lg flex items-center gap-1"><Download className="w-3.5 h-3.5" /> Save to library &amp; download</button>
+        <button onClick={() => onExport(name, includeDurations, false)} className="border border-gray-300 text-sm px-3 py-1.5 rounded-lg">Download only</button>
       </div>
     </Modal>
   );
@@ -1309,10 +1309,10 @@ function BulkImportModal({ onClose, onImport }: { onClose: () => void; onImport:
     <Modal title="Bulk import from text" onClose={onClose}>
       {!parsed ? (
         <>
-          <p className="text-xs text-gray-500 mb-2">
+          <p className="text-sm text-gray-500 mb-2">
             One line per row, separated by <code className="bg-gray-100 px-1 rounded">|</code>: <b>level</b> (1=stage, 2=main task, 3=sub task) | <b>title</b> | plan start | plan end | actual start | actual end. Dates are optional.
           </p>
-          <pre className="text-[10px] bg-gray-50 border border-gray-200 rounded-lg p-2 mb-2 whitespace-pre-wrap text-gray-500 leading-relaxed">
+          <pre className="text-sm bg-gray-50 border border-gray-200 rounded-lg p-2 mb-2 whitespace-pre-wrap text-gray-500 leading-relaxed">
 {`1 | Pre-Quotation
 2 | Initiate discussion on requirements | 10-Sep-25 | 17-Sep-25 | 10-Sep-25 | 17-Sep-25
 3 | Receive query on affected infra
@@ -1320,29 +1320,29 @@ function BulkImportModal({ onClose, onImport }: { onClose: () => void; onImport:
           </pre>
           <textarea value={text} onChange={e => setText(e.target.value)} rows={10}
             placeholder="Paste or type here…"
-            className="w-full text-xs font-mono border border-gray-300 rounded-lg px-2 py-1.5 mb-3" />
+            className="w-full text-sm font-mono border border-gray-300 rounded-lg px-2 py-1.5 mb-3" />
           <button disabled={!text.trim()} onClick={() => setParsed(parseBulkText(text))}
-            className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg disabled:opacity-40">Preview</button>
+            className="bg-blue-600 text-white text-sm px-3 py-1.5 rounded-lg disabled:opacity-40">Preview</button>
         </>
       ) : (
         <>
-          <p className="text-xs text-gray-500 mb-2">
+          <p className="text-sm text-gray-500 mb-2">
             {parsed.stages.length} stage(s), {parsed.stages.reduce((s, st) => s + st.tasks.length, 0)} main task(s),{" "}
             {parsed.stages.reduce((s, st) => s + st.tasks.reduce((s2, t) => s2 + t.subTasks.length, 0), 0)} sub task(s) found.
           </p>
           {parsed.errors.length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-2 mb-2 text-xs text-red-600 max-h-24 overflow-y-auto">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-2 mb-2 text-sm text-red-600 max-h-24 overflow-y-auto">
               {parsed.errors.map((e, i) => <p key={i}>{e}</p>)}
             </div>
           )}
           <div className="border border-gray-200 rounded-lg overflow-hidden mb-3 max-h-56 overflow-y-auto">
-            {parsed.stages.length === 0 && <p className="text-xs text-gray-400 text-center py-4">Nothing valid parsed — check the format.</p>}
+            {parsed.stages.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Nothing valid parsed — check the format.</p>}
             {parsed.stages.map((s, i) => (
               <div key={i}>
-                <div className="bg-gray-50 px-3 py-1.5 text-xs font-medium border-b border-gray-100">{s.name}</div>
+                <div className="bg-gray-50 px-3 py-1.5 text-sm font-medium border-b border-gray-100">{s.name}</div>
                 {s.tasks.map((t, j) => (
                   <div key={j}>
-                    <div className="px-5 py-1 text-xs border-b border-gray-100">
+                    <div className="px-5 py-1 text-sm border-b border-gray-100">
                       {t.title}
                       {t.planStart && <span className="text-gray-400"> plan: {fmtDate(t.planStart)}–{fmtDate(t.planEnd)}</span>}
                       {t.actualStart && <span className="text-blue-500"> actual: {fmtDate(t.actualStart)}–{fmtDate(t.actualEnd)}</span>}
@@ -1360,9 +1360,9 @@ function BulkImportModal({ onClose, onImport }: { onClose: () => void; onImport:
             ))}
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setParsed(null)} className="border border-gray-300 text-xs px-3 py-1.5 rounded-lg">Back</button>
+            <button onClick={() => setParsed(null)} className="border border-gray-300 text-sm px-3 py-1.5 rounded-lg">Back</button>
             <button disabled={parsed.stages.length === 0} onClick={() => onImport(parsed.stages)}
-              className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg disabled:opacity-40">Import into project</button>
+              className="bg-blue-600 text-white text-sm px-3 py-1.5 rounded-lg disabled:opacity-40">Import into project</button>
           </div>
         </>
       )}
@@ -1380,47 +1380,47 @@ function ImportModal({ templates, step, setStep, selected, setSelected, startDat
     <Modal title="Import template" onClose={onClose}>
       {step === 1 && (
         <>
-          <p className="text-xs text-gray-400 mb-2">Choose a saved SOP template</p>
+          <p className="text-sm text-gray-400 mb-2">Choose a saved SOP template</p>
           <div className="space-y-1.5 mb-4 max-h-52 overflow-y-auto">
-            {templates.length === 0 && <p className="text-xs text-gray-400 py-4 text-center">No templates saved yet. Export a project first.</p>}
+            {templates.length === 0 && <p className="text-sm text-gray-400 py-4 text-center">No templates saved yet. Export a project first.</p>}
             {templates.map(t => (
               <div key={t.id} onClick={() => setSelected(t)} className={`border rounded-lg px-3 py-2 cursor-pointer ${selected?.id === t.id ? "border-blue-400 bg-blue-50" : "border-gray-200"}`}>
-                <p className="text-xs font-medium">{t.name}</p>
-                <p className="text-[10px] text-gray-400">{new Date(t.createdAt).toLocaleDateString()} {t.team ? `· ${t.team}` : ""}</p>
+                <p className="text-sm font-medium">{t.name}</p>
+                <p className="text-sm text-gray-400">{new Date(t.createdAt).toLocaleDateString()} {t.team ? `· ${t.team}` : ""}</p>
               </div>
             ))}
           </div>
-          <button disabled={!selected} onClick={() => setStep(2)} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg disabled:opacity-40">Next — Preview</button>
+          <button disabled={!selected} onClick={() => setStep(2)} className="bg-blue-600 text-white text-sm px-3 py-1.5 rounded-lg disabled:opacity-40">Next — Preview</button>
         </>
       )}
       {step === 2 && structure && (
         <>
-          <p className="text-xs text-gray-400 mb-2">Preview of <b>{selected?.name}</b></p>
+          <p className="text-sm text-gray-400 mb-2">Preview of <b>{selected?.name}</b></p>
           <div className="border border-gray-200 rounded-lg overflow-hidden mb-4 max-h-56 overflow-y-auto">
             {structure.stages.map((s, i) => (
               <div key={i}>
-                <div className="bg-gray-50 px-3 py-1.5 text-xs font-medium border-b border-gray-100">{s.name}</div>
+                <div className="bg-gray-50 px-3 py-1.5 text-sm font-medium border-b border-gray-100">{s.name}</div>
                 {s.tasks.map((t, j) => (
-                  <div key={j} className="px-5 py-1 text-xs border-b border-gray-100 flex items-center gap-1.5">
-                    {t.title} {t.isMilestone && <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 rounded-full">Milestone</span>}
+                  <div key={j} className="px-5 py-1 text-sm border-b border-gray-100 flex items-center gap-1.5">
+                    {t.title} {t.isMilestone && <span className="text-[11px] bg-purple-100 text-purple-700 px-1.5 rounded-full">Milestone</span>}
                   </div>
                 ))}
               </div>
             ))}
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setStep(1)} className="border border-gray-300 text-xs px-3 py-1.5 rounded-lg">Back</button>
-            <button onClick={() => setStep(3)} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg">Next — Set dates</button>
+            <button onClick={() => setStep(1)} className="border border-gray-300 text-sm px-3 py-1.5 rounded-lg">Back</button>
+            <button onClick={() => setStep(3)} className="bg-blue-600 text-white text-sm px-3 py-1.5 rounded-lg">Next — Set dates</button>
           </div>
         </>
       )}
       {step === 3 && (
         <>
-          <p className="text-xs text-gray-400 mb-2">Set the project start date. End dates calculate from durations, editable after import.</p>
+          <p className="text-sm text-gray-400 mb-2">Set the project start date. End dates calculate from durations, editable after import.</p>
           <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 mb-4" />
           <div className="flex gap-2">
-            <button onClick={() => setStep(2)} className="border border-gray-300 text-xs px-3 py-1.5 rounded-lg">Back</button>
-            <button onClick={onImport} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg flex items-center gap-1"><Upload className="w-3.5 h-3.5" /> Import into project</button>
+            <button onClick={() => setStep(2)} className="border border-gray-300 text-sm px-3 py-1.5 rounded-lg">Back</button>
+            <button onClick={onImport} className="bg-blue-600 text-white text-sm px-3 py-1.5 rounded-lg flex items-center gap-1"><Upload className="w-3.5 h-3.5" /> Import into project</button>
           </div>
         </>
       )}
