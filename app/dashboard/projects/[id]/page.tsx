@@ -253,6 +253,11 @@ export default function ProjectDetailPage() {
     await fetch(`/api/projects/${id}/files`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, url }) });
     loadBackground();
   };
+  const deleteFile = async (fileId: string) => {
+    if (!confirm("Remove this file from the project?")) return;
+    setFiles(prev => prev.filter(f => f.id !== fileId));
+    fetch(`/api/projects/${id}/files/${fileId}`, { method: "DELETE" });
+  };
 
   // ── Stage/task handlers ──
   // These update local state immediately (optimistic) instead of writing then
@@ -515,7 +520,7 @@ export default function ProjectDetailPage() {
       {tab === "background" && (
         <BackgroundTab
           bg={bg} bgForm={bgForm} setBgForm={setBgForm} editing={editingBg} setEditing={setEditingBg} save={saveBg}
-          files={files} addFile={addFile}
+          files={files} addFile={addFile} deleteFile={deleteFile}
           stages={stages} tasks={tasks}
           openTasks={openTasks} toggleOpen={toggleOpen}
         />
@@ -634,11 +639,11 @@ function EditableName({ value, onSave, className }: { value: string; onSave: (v:
 
 function BackgroundTab(props: {
   bg: Background | null; bgForm: Background; setBgForm: (b: Background) => void; editing: boolean; setEditing: (b: boolean) => void; save: () => void;
-  files: ProjFile[]; addFile: () => void;
+  files: ProjFile[]; addFile: () => void; deleteFile: (fileId: string) => void;
   stages: Stage[]; tasks: PlanTask[];
   openTasks: Set<string>; toggleOpen: (id: string) => void;
 }) {
-  const { bg, bgForm, setBgForm, editing, setEditing, save, files, addFile, stages, tasks, openTasks, toggleOpen } = props;
+  const { bg, bgForm, setBgForm, editing, setEditing, save, files, addFile, deleteFile, stages, tasks, openTasks, toggleOpen } = props;
   return (
     <div>
       <div className="grid grid-cols-2 gap-4 mb-6">
@@ -684,9 +689,14 @@ function BackgroundTab(props: {
       <p className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Diagrams &amp; project plans</p>
       <div className="flex gap-2 flex-wrap mb-6">
         {files.map(f => (
-          <a key={f.id} href={f.url} target="_blank" className="flex items-center gap-1.5 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-white hover:border-blue-300">
-            <FileText className="w-3.5 h-3.5 text-gray-400" /> {f.name}
-          </a>
+          <div key={f.id} className="flex items-center gap-1.5 border border-gray-200 rounded-lg pl-2.5 pr-1.5 py-1.5 text-sm bg-white hover:border-blue-300">
+            <a href={f.url} target="_blank" className="flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-gray-400" /> {f.name}
+            </a>
+            <button onClick={() => deleteFile(f.id)} title="Remove file" className="text-gray-300 hover:text-red-500 p-0.5">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
         ))}
         <button onClick={addFile} className="flex items-center gap-1.5 border border-dashed border-gray-300 rounded-lg px-2.5 py-1.5 text-sm text-gray-500 hover:border-blue-300">
           <Upload className="w-3.5 h-3.5" /> Upload…
