@@ -852,7 +852,9 @@ function TaskTree(props: {
       </div>
 
       {taskView === "timeline" ? (
-        <GanttView stages={stages} tasks={tasks} openTasks={openTasks} toggleOpen={toggleOpen} />
+        <GanttView stages={stages} tasks={tasks} openTasks={openTasks} toggleOpen={toggleOpen}
+          comments={comments} patchTask={patchTask} toggleMilestone={toggleMilestone} deleteTask={deleteTask}
+          submitRemark={submitRemark} attachPhoto={attachPhoto} />
       ) : (
       <div className="overflow-x-auto">
       <div className="border border-gray-200 rounded-xl overflow-hidden">
@@ -922,11 +924,20 @@ function TaskTree(props: {
 
 // ── Gantt / Timeline view ────────────────────────────────────────────────
 
-function GanttView({ stages, tasks, openTasks, toggleOpen }: { stages: Stage[]; tasks: PlanTask[]; openTasks: Set<string>; toggleOpen: (id: string) => void }) {
+function GanttView({ stages, tasks, openTasks, toggleOpen, comments, patchTask, toggleMilestone, deleteTask, submitRemark, attachPhoto }: {
+  stages: Stage[]; tasks: PlanTask[]; openTasks: Set<string>; toggleOpen: (id: string) => void;
+  comments: Comment[];
+  patchTask: (id: string, v: Partial<PlanTask>) => void;
+  toggleMilestone: (t: PlanTask) => void;
+  deleteTask: (id: string) => void;
+  submitRemark: (taskId: string, text: string) => void;
+  attachPhoto: (id: string) => void;
+}) {
   const [focusMode, setFocusMode] = useState(false);
   const [showPast, setShowPast] = useState(false);
   const [showFuture, setShowFuture] = useState(false);
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
 
   const allDates: number[] = [];
   for (const s of stages) {
@@ -1023,8 +1034,8 @@ function GanttView({ stages, tasks, openTasks, toggleOpen }: { stages: Stage[]; 
     rows.push({
       key: t.id,
       label: (
-        <div className={`h-10 flex items-center gap-1.5 pr-4 text-sm cursor-pointer ${t.parentId ? "pl-6" : ""} ${dim ? "opacity-50" : ""}`} onClick={() => hasChildren && toggleOpen(t.id)}>
-          {hasChildren && <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(t.id) ? "rotate-90" : ""}`} />}
+        <div className={`h-10 flex items-center gap-1.5 pr-4 text-sm cursor-pointer ${t.parentId ? "pl-6" : ""} ${dim ? "opacity-50" : ""}`} onClick={() => setDetailTaskId(t.id)}>
+          {hasChildren && <ChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${openTasks.has(t.id) ? "rotate-90" : ""}`} onClick={e => { e.stopPropagation(); toggleOpen(t.id); }} />}
           {t.isMilestone ? <span className="w-1.5 h-1.5 rotate-45 flex-shrink-0" style={{ background: "#9333EA" }} /> : <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-gray-300" />}
           <span className={`line-clamp-2 ${t.status === "done" ? "line-through text-gray-400" : t.isMilestone ? "text-purple-700 font-medium" : t.parentId ? "text-gray-500" : "text-gray-700"}`}>{t.title}</span>
           {opts.badge === "current" && <span className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full animate-pulse flex-shrink-0" style={{ background: CURRENT_COLOR }}>● CURRENT</span>}
@@ -1032,7 +1043,7 @@ function GanttView({ stages, tasks, openTasks, toggleOpen }: { stages: Stage[]; 
         </div>
       ),
       bar: (
-        <div title={tooltip} className={`relative h-10 rounded hover:bg-gray-50 ${dim ? "opacity-50" : ""}`}>
+        <div title={tooltip} onClick={() => setDetailTaskId(t.id)} className={`relative h-10 rounded cursor-pointer hover:bg-gray-50 ${dim ? "opacity-50" : ""}`}>
           {renderDecorations()}
           <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1.5 bg-gray-100 rounded" />
           {planL !== null && planR !== null && (
@@ -1180,6 +1191,19 @@ function GanttView({ stages, tasks, openTasks, toggleOpen }: { stages: Stage[]; 
           </div>
         </div>
       </div>
+
+      {detailTaskId && tasks.find(t => t.id === detailTaskId) && (
+        <TaskDetailModal
+          task={tasks.find(t => t.id === detailTaskId)!}
+          comments={comments}
+          onClose={() => setDetailTaskId(null)}
+          patchTask={patchTask}
+          toggleMilestone={toggleMilestone}
+          deleteTask={deleteTask}
+          submitRemark={submitRemark}
+          attachPhoto={attachPhoto}
+        />
+      )}
     </div>
   );
 }
@@ -1324,6 +1348,50 @@ function CommentBox({ taskId, comments, submitRemark, attachPhoto, indent }: {
   );
 }
 
+function TaskDetailModal({ task, comments, onClose, patchTask, toggleMilestone, deleteTask, submitRemark, attachPhoto }: {
+  task: PlanTask; comments: Comment[]; onClose: () => void;
+  patchTask: (id: string, v: Partial<PlanTask>) => void;
+  toggleMilestone: (t: PlanTask) => void;
+  deleteTask: (id: string) => void;
+  submitRemark: (taskId: string, text: string) => void;
+  attachPhoto: (id: string) => void;
+}) {
+  const taskComments = comments.filter(c => c.taskId === task.id);
+  return (
+    <Modal title={task.parentId ? "Sub task details" : "Main task details"} onClose={onClose} wide>
+      <EditableName value={task.title} onSave={v => patchTask(task.id, { title: v })} className="text-base font-semibold block mb-3" />
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <label className="text-sm text-gray-500">Plan start
+          <input type="date" value={task.planStart ?? ""} onChange={e => patchTask(task.id, { planStart: e.target.value || null })} className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5 mt-0.5" />
+        </label>
+        <label className="text-sm text-gray-500">Plan end
+          <input type="date" value={task.planEnd ?? ""} onChange={e => patchTask(task.id, { planEnd: e.target.value || null })} className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5 mt-0.5" />
+        </label>
+        <label className="text-sm text-gray-500">Actual start
+          <input type="date" value={task.actualStart ?? ""} onChange={e => patchTask(task.id, { actualStart: e.target.value || null })} className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5 mt-0.5" />
+        </label>
+        <label className="text-sm text-gray-500">Actual end
+          <input type="date" value={task.actualEnd ?? ""} onChange={e => patchTask(task.id, { actualEnd: e.target.value || null })} className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5 mt-0.5" />
+        </label>
+      </div>
+      <div className="flex items-center gap-3 mb-4">
+        <select value={task.status} onChange={e => patchTask(task.id, { status: e.target.value as StageStatus })} className="text-sm border border-gray-300 rounded-lg px-2 py-1.5">
+          <option value="pending">Pending</option>
+          <option value="in_progress">In progress</option>
+          <option value="done">Done</option>
+        </select>
+        <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+          <input type="checkbox" checked={task.isMilestone} onChange={() => toggleMilestone(task)} /> Milestone
+        </label>
+        <button onClick={() => { if (confirm("Delete this task?")) { deleteTask(task.id); onClose(); } }}
+          className="ml-auto text-sm text-red-500 hover:underline flex items-center gap-1"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
+      </div>
+      <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Remarks</p>
+      <CommentBox taskId={task.id} comments={taskComments} submitRemark={submitRemark} attachPhoto={() => attachPhoto(task.id)} indent={0} />
+    </Modal>
+  );
+}
+
 // ── Finance Tab ─────────────────────────────────────────────────────────
 
 function FinanceTab({
@@ -1448,10 +1516,10 @@ function FinanceTab({
   );
 }
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl">
+      <div className={`bg-white rounded-2xl p-5 w-full shadow-xl ${wide ? "max-w-xl" : "max-w-sm"}`}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-gray-900 text-sm">{title}</h3>
           <button onClick={onClose}><X className="w-4 h-4 text-gray-400" /></button>
